@@ -143,6 +143,16 @@ void timer_tick(struct timer_t * timer) {
 	}
 }
 
+uint32_t timer_nearest(struct timer_t * timer) {
+	uint32_t current = timer->current;
+	uint32_t n = 0;
+	for (; current < timer->listn; ++curren, ++n) {
+		if (timer->list[current].head)
+			break;
+	}
+	return n;
+}
+
 /* test
 struct timer_t * timer = NULL;
 static void test_cb(void *ud) {
