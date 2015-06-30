@@ -14,7 +14,7 @@ static void signal_handler(int signal); 	//进程信号回调
 static int _stop = 0;	//是否结束标志
 
 int main() {
-	timer_test(); return 1;
+	//timer_test(); return 1;
 	//设置进程信号处理
 	signal(SIGPIPE,SIG_IGN);
 	sigset_t old_mask;
@@ -76,7 +76,7 @@ void * service_runable(void * ptr) {			//驱动 service 进行工作
 	struct service_t * service = (struct service_t *) ptr;
 	do {
 		service_runonce(service);
-		usleep(1000*50);
+		usleep(1000*10);	//service 时间精度为 1/10 秒, 这里也睡眠1/10秒
 	} 
 	while (!_stop);
 

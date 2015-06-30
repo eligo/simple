@@ -7,6 +7,8 @@ local gtResponser = {_sid=nil}		--
 local json = require("scripts.util.json")	--json 工具, 也许你还需要别的工具, 如数据库访问工具等...
 
 require ("scripts.handle.test_handle")		--协议处理
+require ("scripts.util.timer")
+gTimer:init()
 
 function c_onTcpAccepted(sid)	--框架事件通知
 end
@@ -35,15 +37,26 @@ function c_onTcpData(sid, str)	--框架事件通知
 	end
 end
 
+function c_onTimer(tid, erased)
+	gTimer:onTimer(tid, erased)
+end
+
 function gtResponser:write (content)
 	local ty = type (content)
 	if ty == 'table' then
-		c_interface.c_sendsocket(self._sid, json.encode(content))
+		c_interface.c_send(self._sid, json.encode(content))
 	elseif ty == 'string' then
-		c_interface.c_sendsocket(self._sid, content)
+		c_interface.c_send(self._sid, content)
 	end
 end
 
 function gtResponser:closeconnect ()
-	c_interface.c_closesocket(self._sid)
+	c_interface.c_close(self._sid)
 end
+
+gTimer:timeout(10, 2, 
+function(...)
+	print("hello world", ...)
+end,
+1
+)

@@ -5,6 +5,7 @@
 #include <string.h>
 #include <assert.h>
 #include <stdio.h>
+#include <sys/time.h>
 
 struct tobjqueue_t ;
 struct tobj_t {						//用户节点(需定时的对象)
@@ -60,7 +61,7 @@ static void uq_addtail(struct tobjqueue_t * queue, struct tobj_t * tobj);
 static struct tobj_t * uq_pophead(struct tobjqueue_t * queue);
 static void uq_erase(struct tobjqueue_t * queue, struct tobj_t * tobj);
 
-struct timer_t * timer_new(uint32_t tickn) {
+struct timer_t* timer_new(uint32_t tickn) {
 	struct timer_t * timer = (struct timer_t *)MALLOC(sizeof(*timer));
 	memset(timer, 0, sizeof(*timer));
 	timer->ticklistn = tickn;
@@ -118,14 +119,20 @@ void timer_tick(struct timer_t * timer) {
 	while (num-- > 0) {
 		struct tobj_t * tobj = uq_pophead(tick);
 		if (NULL == tobj) break;
-		timer->ticking = tobj->id;						//设置为正在触发状态
-		tobj->cb(tobj->ud);
+		func_timer_callback cb = tobj->cb;
+		func_timer_callback ud = tobj->ud;
+		uint32_t tid = tobj->id;		
+		timer->ticking = tid;						//设置为正在触发状态
+		int erased = 0;
+		//tobj->cb(tobj->ud, tobj->id);
 		if (tobj->repeat > 0 && --tobj->repeat == 0) {	//使用结束回收该用户节点
 			tobj->cb = NULL;
 			uq_addtail(&timer->freelist, tobj);
+			erased = 1;
 		} else {											//暂不回收
 			add_obj_raw(timer, tobj, tobj->timeout, tobj->timeout, tobj->repeat, tobj->ud, tobj->cb);
 		}
+		cb(ud, tid, erased);
 	}
 	timer->current = (++timer->current)%timer->ticklistn;
 	timer->ticking = 0;
@@ -253,10 +260,13 @@ void expand_objpool(struct timer_t * timer) {	//扩展用户节点数量
 }
 
 
-
-
+uint64_t time_currentms() {
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+	return tv.tv_sec * 1000 + tv.tv_usec / 1000;
+}
+/*
 struct timer_t * timer = NULL;
-uint32_t id = 0;
 static void _cb(void *ud) {
 	printf("...cb %d %d\n", (int)ud, id);
 	//timer_del(timer, id);
@@ -267,26 +277,10 @@ void timer_test() {
 	timer_add(timer, 2, (void*)2, _cb, 3);
 	
 	id = timer_add(timer, 10, (void*)10, _cb, 2);
-	printf("ddddd %d\n", id);
-	/*
-	timer_add(timer, 3, (void*)3, _cb, 1);
-	timer_add(timer, 5, (void*)5, _cb, 1);
-	timer_add(timer, 6, (void*)6, _cb, 1);
-	timer_add(timer, 8, (void*)8, _cb, 1);
-	timer_add(timer, 9, (void*)9, _cb, 1);
-	
-	timer_add(timer, 11, (void*)11, _cb, 1);
-	timer_add(timer, 12, (void*)12, _cb, 1);
-	timer_add(timer, 13, (void*)13, _cb, 1);
-	timer_add(timer, 18, (void*)18, _cb, 1);
-	timer_add(timer, 19, (void*)19, _cb, 1);
-	timer_add(timer, 20, (void*)20, _cb, 1);
-	timer_add(timer, 30, (void*)30, _cb, 1);
-	timer_add(timer, 60, (void*)60, _cb, 1);*/
 	int i= 0;
 	for (;i<80;i++) {
 		printf("current tick %d\n", i);
 		timer_tick(timer);
 	}
 			
-}
+}*/
