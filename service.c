@@ -66,10 +66,10 @@ void service_delete(struct service_t * service) {
 	}
 }
 
-void service_timer(struct service_t* service, uint64_t ctick) {
+void service_tick(struct service_t* service, uint64_t ctick) {
 	if (ctick < service->tick)	//被意外修改过系统时间(向后修改)
 		service->tick = ctick;
-	
+
 	uint64_t cost = ctick - service->tick;
 	if (cost > 0) {
 		while (cost-- > 0) {
@@ -81,7 +81,7 @@ void service_timer(struct service_t* service, uint64_t ctick) {
 
 void service_runonce(struct service_t * service) {
 	uint32_t count = 0;
-	service_timer(service, time_currentms()/100);	//处理定时器
+	service_tick(service, time_currentms()/100);	//处理定时器
 	while (1) {	//处理业务
 		int type = 0;
 		void * packet = gsq_pop(service->g2s_queue, &type);
@@ -109,10 +109,10 @@ void service_runonce(struct service_t * service) {
 		}
 		free (packet);
 		if (++count%100 == 0)	//100是经验值可换成别的, 每处理100个业务包就处理一下定时器
-			service_timer(service, time_currentms()/100);	//处理定时器	
+			service_tick(service, time_currentms()/100);	//处理定时器	
 	}
 
-	if (count) service_timer(service, time_currentms()/100);
+	if (count) service_tick(service, time_currentms()/100);
 }
 
 static int lua_error_cb (lua_State* L);
@@ -169,7 +169,6 @@ static struct service_t * get_service(struct lua_State * lparser) {
 }
 
 int c_send (struct lua_State * lparser) {
-	//int st = lua_gettop(lparser);
 	size_t len = 0;
 	struct service_t * service = get_service(lparser);
 	const int sid = luaL_checkinteger(lparser, 1); 
@@ -180,18 +179,15 @@ int c_send (struct lua_State * lparser) {
 	ev->dlen = len;
 	memcpy (ev->data, data, len);
 	gsq_push (service->s2g_queue, S2G_TCP_DATA, ev);
-	//lua_settop(lparser, st);
 	return 0;
 }
 
 int c_close (struct lua_State * lparser) {
-	//int st = lua_gettop(lparser);
 	struct service_t * service = get_service(lparser);
 	const int sid = luaL_checkinteger(lparser, 1); 
 	struct s2g_tcp_close_t * ev = (struct s2g_tcp_close_t*) malloc (sizeof(*ev));
 	ev->sid = sid;
 	gsq_push (service->s2g_queue, S2G_TCP_CLOSE, ev);
-	//lua_settop(lparser, st);
 	return 0;
 }
 
@@ -200,7 +196,6 @@ void time_cb (void * ud, uint32_t tid, int erased) {
 }
 
 int c_timeout (struct lua_State * lparser) {
-	//int st = lua_gettop(lparser);
 	struct service_t * service = get_service(lparser);
 	uint32_t timeout = luaL_checkinteger(lparser, 1);
 	int32_t  repeate = luaL_checkinteger(lparser, 2);
