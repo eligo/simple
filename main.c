@@ -14,6 +14,7 @@ static void signal_handler(int signal); 	//进程信号回调
 static int _stop = 0;	//是否结束标志
 
 int main() {
+	timer_test(); return 1;
 	//设置进程信号处理
 	signal(SIGPIPE,SIG_IGN);
 	sigset_t old_mask;
