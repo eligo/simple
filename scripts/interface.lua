@@ -1,14 +1,10 @@
 --这个文件定义接口以及全局信息
-
-gtMsgHandle = {}	--协议处理方法
-
-local gtResponser = {_sid=nil}		--
-
-local json = require("scripts.util.json")	--json 工具, 也许你还需要别的工具, 如数据库访问工具等...
-
-require ("scripts.handle.test_handle")		--协议处理
+package.cpath = string.format("%s;%s?.so", package.cpath, './3rd/luaso/')
 require ("scripts.util.timer")
+local json = require ('cjson')	--json 工具, 也许你还需要别的工具, 如数据库访问工具等...
+local gtResponser = {_sid=nil}
 gTimer:init()
+gtMsgHandle = {}	--协议处理方法
 
 function c_onTcpAccepted(sid)	--框架事件通知
 end
@@ -60,3 +56,5 @@ function(...)
 end,
 1
 )
+
+require ("scripts.handle.test_handle")		--协议处理
