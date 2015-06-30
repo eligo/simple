@@ -189,8 +189,6 @@ int _tcp_runonce(struct tcpreactor_t * reactor, int waitms, void * ud, tcp_wait_
 			}
 		}
 	}
-	_process_wq(reactor);//flush data from user_w_buf, 有些数据是外部定时器产生的, 先flush一下无伤大雅
-
 	_process_rq(reactor);//read from sys_r_buf
 	_process_pq(reactor);//parse data from user_r_buf, flush by the way
 	_process_wq(reactor);//flush data from user_w_buf

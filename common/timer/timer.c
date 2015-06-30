@@ -43,13 +43,13 @@ static void DIE (const char * msg) {
 	exit(1);
 }
 
-static void *REALLOC(void *p, size_t size) {
+static void* REALLOC(void *p, size_t size) {
 	void * ptr = realloc(p, size);
 	if (!ptr) DIE("TIMER REALLOC FAIL\n");
 	return ptr;
 }
 
-static void *MALLOC(size_t size) {
+static void* MALLOC(size_t size) {
 	void * ptr = malloc(size);
 	if (!ptr) DIE("TIMER MALLOC FAIL\n");
 	return ptr;
