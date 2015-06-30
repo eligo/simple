@@ -1,11 +1,12 @@
 --这个文件定义接口以及全局信息
-package.cpath = string.format("%s;%s?.so", package.cpath, './3rd/luaso/')
-require ("scripts.util.timer")
-local json = require ('cjson')	--json 工具, 也许你还需要别的工具, 如数据库访问工具等...
+package.cpath = string.format("%s;%s?.so", package.cpath, './3rd/luaso/')	--设置外部c库的搜索路径
+require ("scripts.util.timer")	
+local json = require ('cjson')	--json 工具(encode decode)
 local gtResponser = {_sid=nil}
-gTimer:init()
-gtMsgHandle = {}	--协议处理方法
+gTimer:init()					--定时器管理器
+gtMsgHandle = {}				--协议处理
 
+---------------------------------------------------------framework event---------------------------------------------------------
 function c_onTcpAccepted(sid)	--框架事件通知
 end
 
@@ -37,6 +38,7 @@ function c_onTimer(tid, erased)
 	gTimer:onTimer(tid, erased)
 end
 
+---------------------------------------------------------other---------------------------------------------------------
 function gtResponser:write (content)
 	local ty = type (content)
 	if ty == 'table' then
@@ -57,4 +59,6 @@ end,
 1
 )
 
+
+---------------------------------------------------------other require---------------------------------------------------------
 require ("scripts.handle.test_handle")		--协议处理

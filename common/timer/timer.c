@@ -265,22 +265,3 @@ uint64_t time_currentms() {
 	gettimeofday(&tv, NULL);
 	return tv.tv_sec * 1000 + tv.tv_usec / 1000;
 }
-/*
-struct timer_t * timer = NULL;
-static void _cb(void *ud) {
-	printf("...cb %d %d\n", (int)ud, id);
-	//timer_del(timer, id);
-}
-
-void timer_test() {
-	timer = timer_new(5);
-	timer_add(timer, 2, (void*)2, _cb, 3);
-	
-	id = timer_add(timer, 10, (void*)10, _cb, 2);
-	int i= 0;
-	for (;i<80;i++) {
-		printf("current tick %d\n", i);
-		timer_tick(timer);
-	}
-			
-}*/
