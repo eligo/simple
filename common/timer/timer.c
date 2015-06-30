@@ -31,7 +31,7 @@ struct timer_t {					//定时器
 	uint32_t ticklistn;				//时刻节点数量
 	uint32_t current;				//当时时刻
 	struct tobjqueue_t longlist;	//长时刻
-	uint8_t ticking;				//是否正在触发定时
+	uint32_t ticking;				//正在触发定时的用户节点
 	struct tobj_t** objpool;		//用户节点池
 	uint32_t objpooln;				//池数量
 	struct tobjqueue_t freelist;	//空闲的用户节点
@@ -55,10 +55,10 @@ static void *MALLOC(size_t size) {
 }
 
 static void expand_objpool(struct timer_t * timer);
-static void timer_add_raw (struct timer_t * timer, struct tobj_t * tobj, uint32_t timeleft, uint32_t timeout, uint32_t repeat, void * ud, func_timer_callback cb);
-static void tick_addtail(struct tobjqueue_t * tick, struct tobj_t * tobj);
-static struct tobj_t * tick_pophead(struct tobjqueue_t * tick);
-static void tick_erase(struct tobjqueue_t * tick, struct tobj_t * tobj);
+static void add_obj_raw (struct timer_t * timer, struct tobj_t * tobj, uint32_t timeleft, uint32_t timeout, uint32_t repeat, void * ud, func_timer_callback cb);
+static void uq_addtail(struct tobjqueue_t * queue, struct tobj_t * tobj);
+static struct tobj_t * uq_pophead(struct tobjqueue_t * queue);
+static void uq_erase(struct tobjqueue_t * queue, struct tobj_t * tobj);
 
 struct timer_t * timer_new(uint32_t tickn) {
 	struct timer_t * timer = (struct timer_t *)MALLOC(sizeof(*timer));
@@ -84,14 +84,14 @@ void timer_destroy(struct timer_t * timer) {
 }
 
 uint32_t timer_add(struct timer_t * timer, uint32_t timeout, void * ud, func_timer_callback cb, uint32_t repeat) {
-	struct tobj_t * tobj = tick_pophead(&timer->freelist);
+	struct tobj_t * tobj = uq_pophead(&timer->freelist);
 	if (!tobj) {
 		expand_objpool(timer);
-		tobj = tick_pophead(&timer->freelist);
+		tobj = uq_pophead(&timer->freelist);
 	}
 
 	assert(tobj);
-	timer_add_raw(timer, tobj, timeout, timeout, repeat, ud, cb);
+	add_obj_raw(timer, tobj, timeout, timeout, repeat, ud, cb);
 	return tobj->id;
 }
 
@@ -106,8 +106,8 @@ int timer_del(struct timer_t * timer, uint32_t tid) {
 	} 
 
 	assert(tobj->container);
-	tick_erase(tobj->container, tobj);		//从时间点上把它移出
-	tick_addtail(&timer->freelist, tobj);	//并放回用户池备用
+	uq_erase(tobj->container, tobj);		//从时间点上把它移出
+	uq_addtail(&timer->freelist, tobj);	//并放回用户池备用
 	return 0;
 }
 
@@ -116,15 +116,15 @@ void timer_tick(struct timer_t * timer) {
 	struct tobjqueue_t * tick = &timer->ticklist[slot];
 	uint32_t num = tick->objn;
 	while (num-- > 0) {
-		struct tobj_t * tobj = tick_pophead(tick);
+		struct tobj_t * tobj = uq_pophead(tick);
 		if (NULL == tobj) break;
 		timer->ticking = tobj->id;						//设置为正在触发状态
 		tobj->cb(tobj->ud);
 		if (tobj->repeat > 0 && --tobj->repeat == 0) {	//使用结束回收该用户节点
 			tobj->cb = NULL;
-			tick_addtail(&timer->freelist, tobj);
+			uq_addtail(&timer->freelist, tobj);
 		} else {											//暂不回收
-			timer_add_raw(timer, tobj, tobj->timeout, tobj->timeout, tobj->repeat, tobj->ud, tobj->cb);
+			add_obj_raw(timer, tobj, tobj->timeout, tobj->timeout, tobj->repeat, tobj->ud, tobj->cb);
 		}
 	}
 	timer->current = (++timer->current)%timer->ticklistn;
@@ -132,21 +132,21 @@ void timer_tick(struct timer_t * timer) {
 	if (timer->current == 0) {
 		struct tobjqueue_t tmptick;
 		memset(&tmptick, 0, sizeof(tmptick));
-		struct tobj_t * tobj = tick_pophead(&timer->longlist);
+		struct tobj_t * tobj = uq_pophead(&timer->longlist);
 		while (tobj) {
 			if (tobj->timeleft < timer->ticklistn) {
-				timer_add_raw(timer, tobj, tobj->timeleft, tobj->timeout, tobj->repeat, tobj->ud, tobj->cb);
+				add_obj_raw(timer, tobj, tobj->timeleft, tobj->timeout, tobj->repeat, tobj->ud, tobj->cb);
 			} else {
 				tobj->timeleft -= timer->ticklistn;
-				tick_addtail(&tmptick, tobj);
+				uq_addtail(&tmptick, tobj);
 			}
-			tobj = tick_pophead(&timer->longlist);
+			tobj = uq_pophead(&timer->longlist);
 		}
 
-		tobj = tick_pophead(&tmptick);
+		tobj = uq_pophead(&tmptick);
 		while (tobj) {
-			tick_addtail(&timer->longlist, tobj);
-			tobj = tick_pophead(&tmptick);
+			uq_addtail(&timer->longlist, tobj);
+			tobj = uq_pophead(&tmptick);
 		}
 	}
 }
@@ -161,7 +161,7 @@ uint32_t timer_nearest(struct timer_t * timer) {
 	return n;
 }
 
-void tick_addtail(struct tobjqueue_t * tick, struct tobj_t * tobj) {
+void uq_addtail(struct tobjqueue_t * tick, struct tobj_t * tobj) {
 	assert(tick);
 	assert(tobj->container == NULL);
 	tobj->container = tick;
@@ -181,7 +181,7 @@ void tick_addtail(struct tobjqueue_t * tick, struct tobj_t * tobj) {
 	++tick->objn;
 }
 
-struct tobj_t * tick_pophead(struct tobjqueue_t * tick) {
+struct tobj_t * uq_pophead(struct tobjqueue_t * tick) {
 	struct tobj_t * tobj = tick->head;
 	if (tobj) {
 		assert(tick == tobj->container);
@@ -201,7 +201,7 @@ struct tobj_t * tick_pophead(struct tobjqueue_t * tick) {
 	return tobj;
 }
 
-void tick_erase(struct tobjqueue_t * tick, struct tobj_t * tobj) {
+void uq_erase(struct tobjqueue_t * tick, struct tobj_t * tobj) {
 	assert(tobj->container == tick);
 	tick->head = tobj->next;
 	if (tick->head)
@@ -217,7 +217,7 @@ void tick_erase(struct tobjqueue_t * tick, struct tobj_t * tobj) {
 	tobj->container = NULL;
 }
 
-void timer_add_raw (struct timer_t * timer, struct tobj_t * tobj, uint32_t timeleft, uint32_t timeout, uint32_t repeat, void * ud, func_timer_callback cb) {
+void add_obj_raw (struct timer_t * timer, struct tobj_t * tobj, uint32_t timeleft, uint32_t timeout, uint32_t repeat, void * ud, func_timer_callback cb) {
 	assert(timeleft <= timeout);
 	if (timer->ticking) {
 		timeleft = timeleft == 0 ? 1 : timeleft;
@@ -230,11 +230,11 @@ void timer_add_raw (struct timer_t * timer, struct tobj_t * tobj, uint32_t timel
 	tobj->next = NULL;
 	if (timeleft >= timer->ticklistn) {
 		tobj->timeleft -= (timer->ticklistn - timer->current);
-		tick_addtail(&timer->longlist, tobj);
+		uq_addtail(&timer->longlist, tobj);
 	} else {
 		uint32_t slot = (timer->current + timeleft) % timer->ticklistn;
 		struct tobjqueue_t * tick = &timer->ticklist[slot];
-		tick_addtail(tick, tobj);
+		uq_addtail(tick, tobj);
 	}
 }
 
@@ -247,7 +247,7 @@ void expand_objpool(struct timer_t * timer) {	//扩展用户节点数量
 		memset(tobj, 0, sizeof(*tobj));
 		tobj->id = i + 1;
 		timer->objpool[i] = tobj;
-		tick_addtail(&timer->freelist, tobj);
+		uq_addtail(&timer->freelist, tobj);
 	}
 	timer->objpooln = pooln;
 }
