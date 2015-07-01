@@ -20,8 +20,9 @@ struct somgr_t {
 	int ep;
 	struct so_t** sos;
 	uint32_t sosn;
-	struct soqueue_t freesos;
-	struct soqueue_t badsos;
+	struct soqueue_t freesos;	//没用上的so
+	struct soqueue_t badsos;	//待关闭的so
+	struct soqueue_t writesos;	//待写的so
 	void* ud;
 	soacb acb;
 	sorcb rcb;
@@ -292,6 +293,10 @@ struct so_t* somgr_alloc_so(struct somgr_t* somgr) {
 
 void somgr_remove_so(struct somgr_t* somgr, struct so_t* so) {
 	if (so_get_state(so, SOS_BAD)) return;
+	if (so->curq) {
+		assert(so->curq == &somgr->writesos);
+		soq_
+	}
 	so_set_state(so, SOS_BAD);
 	struct epoll_event ev;
 	memset(&ev, 0, sizeof(ev));

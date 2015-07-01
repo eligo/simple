@@ -22,7 +22,9 @@ struct so_t {
 	uint32_t state;
 	struct sbuf_t rbuf;
 	struct sbuf_t wbuf;
+	struct so_t* prev;
 	struct so_t* next;
+	struct soqueue_t* curq;
 };
 
 struct soqueue_t {
@@ -42,4 +44,5 @@ void sbuf_reset(struct sbuf_t* sbuf);
 /*soqueue_t op*/
 struct so_t* soqueue_pop(struct soqueue_t* q);
 void soqueue_push(struct soqueue_t* q, struct so_t* so);
+void soqueue_erase(struct so_t* so);
 #endif
