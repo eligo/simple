@@ -1,14 +1,14 @@
 #include "gate.h"
 #include "gsq.h"
-#include "common/tcp/tcp_reactor.h"
+#include "common/somgr/somgr.h"
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
 #include <stdio.h>
 struct gate_t {
-	struct gsq_t * g2s_queue;
-	struct gsq_t * s2g_queue;
-	struct tcpreactor_t * reactor;
+	struct gsq_t* g2s_queue;
+	struct gsq_t* s2g_queue;
+	struct somgr_t* somgr;
 };
 
 static int tcp_accepted(void *ud, int lid, int nid);
@@ -16,30 +16,30 @@ static int tcp_errored (void * ud, int id);
 static int tcp_readed (void * ud, int id, char * data, int len);
 
 struct gate_t * gate_new(int port, struct gsq_t * g2s_queue, struct gsq_t * s2g_queue) {
-	struct gate_t * gate = (struct gate_t *) malloc (sizeof(*gate));
-	struct tcpreactor_t * reactor = tcpreactor_create();
-	if (0 >= tcp_listen(reactor, "0.0.0.0", port, gate, tcp_accepted, tcp_errored)) {	//端口侦听失败
+	struct gate_t* gate = (struct gate_t *) malloc (sizeof(*gate));
+	struct somgr_t* somgr = somgr_new(gate, tcp_accepted, tcp_readed, tcp_errored);
+	if (0 >= somgr_listen(somgr, "0.0.0.0", port)) {	//端口侦听失败
 		fprintf(stderr, "listen fail\n");
-		tcpreactor_destroy(reactor);
+		somgr_destroy(somgr);
 		free (gate);
 		return NULL;
 	}
 	
 	gate->g2s_queue = g2s_queue;
 	gate->s2g_queue = s2g_queue;
-	gate->reactor = reactor;
+	gate->somgr = somgr;
 	return gate;
 }
 
 void gate_delete(struct gate_t * gate) {
 	if (gate) {
-		tcpreactor_destroy(gate->reactor);
+		somgr_destroy(gate->somgr);
 		free(gate);
 	}
 }
 
 void gate_runonce (struct gate_t * gate) {
-	tcpreactor_runonce(gate->reactor, 50);
+	somgr_runonce(gate->somgr, 100);
 	do {
 		int type = 0;
 		void * packet = gsq_pop(gate->s2g_queue, &type);
@@ -47,14 +47,14 @@ void gate_runonce (struct gate_t * gate) {
 		switch (type) {
 			case S2G_TCP_DATA: {
 				struct s2g_tcp_data_t * ev = (struct s2g_tcp_data_t*)packet;
-				tcp_write(gate->reactor, ev->sid, ev->data, ev->dlen, NULL, 0);
+				somgr_write(gate->somgr, ev->sid, ev->data, ev->dlen);
 				free(ev->data);
 				break;
 			}
 			case S2G_TCP_CLOSE: {
 				struct s2g_tcp_data_t * ev = (struct s2g_tcp_data_t*)packet;
-				tcp_flush(gate->reactor, ev->sid);
-				tcp_kick(gate->reactor, ev->sid);
+				//tcp_flush(gate->reactor, ev->sid);
+				somgr_kick(gate->somgr, ev->sid);
 				break;
 			}
 			default: {
@@ -67,7 +67,7 @@ void gate_runonce (struct gate_t * gate) {
 
 int tcp_accepted(void *ud, int lid, int nid) {	//tcp 建立时回调
 	struct gate_t * gate = (struct gate_t *)ud;
-	tcp_ev_cb(gate->reactor, nid, gate, tcp_readed, tcp_errored, NULL, NULL);
+	//tcp_ev_cb(gate->reactor, nid, gate, tcp_readed, tcp_errored, NULL, NULL);
 	struct g2s_tcp_accepted_t * ev = (struct g2s_tcp_accepted_t*) malloc(sizeof(*ev));
 	ev->sid = nid;
 	gsq_push(gate->g2s_queue, G2S_TCP_ACCEPTED, ev);

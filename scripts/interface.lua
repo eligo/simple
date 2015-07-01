@@ -51,14 +51,14 @@ end
 function gtResponser:closeconnect ()
 	c_interface.c_close(self._sid)
 end
-
+--[[
 gTimer:timeout(10, 2, 
 function(...)
 	print("hello world", ...)
 end,
 1
 )
-
+--]]
 
 ---------------------------------------------------------other require---------------------------------------------------------
 require ("scripts.handle.test_handle")		--协议处理

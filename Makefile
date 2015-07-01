@@ -9,7 +9,7 @@ CXXFLAGS=-c -Wall -O2 -g $(INCLUDES)
 
 LIBS=./3rd/lib/liblua.a
 	
-SRCDIRS=. ./common ./common/tcp ./common/timer
+SRCDIRS=. ./common ./common/tcp ./common/somgr ./common/timer
 SRCS=$(foreach dir,$(SRCDIRS),$(wildcard $(dir)/*.c))
 
 OBJS=$(SRCS:.c=.o)
