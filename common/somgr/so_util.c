@@ -83,7 +83,7 @@ void soqueue_push(struct soqueue_t* q, struct so_t* so) {
 		so->next = NULL;
 		so->prev = NULL;
 	}
-	so->cuq = q;
+	so->curq = q;
 	++q->num;
 }
 
@@ -100,9 +100,7 @@ void soqueue_erase(struct so_t* so) {
 		so->next->prev = so->prev;
 	} else {
 		assert(so == q->tail);
-		so->tail = so->prev;
-		if (so->tail)
-			so->tail->next = NULL;
+		q->tail = so->prev;
 	}
 	so->next = NULL;
 	so->prev = NULL;

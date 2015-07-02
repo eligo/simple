@@ -91,7 +91,7 @@ fail4: err = err !=0 ? err : -4;
 	return err;
 }
 
-int somgr_flush(struct somgr_t* somgr, struct so_t* so) {
+int somgr_flush_so(struct somgr_t* somgr, struct so_t* so) {
 	uint32_t dn = 0;
 	int wn = 0;
 dowrite:
@@ -151,7 +151,7 @@ void somgr_proc_rw(struct somgr_t* somgr, struct so_t* so) {
 		}
 	} else goto fail4;
 dowrite:
-	if (0 != somgr_flush(somgr, so))
+	if (0 != somgr_flush_so(somgr, so))
 		goto fail5;
 	return;
 fail1:
@@ -198,8 +198,32 @@ e_adderr:
 
 void somgr_runonce(struct somgr_t* somgr, int wms) {
 	struct epoll_event evs[1024];
-	int en = epoll_wait(somgr->ep, evs, 1024, wms);
+	int en = 0;
 	int i = 0;
+	do {
+		struct so_t* so = soqueue_pop(&somgr->badsos);
+		if (!so) break;
+		uint32_t soid = so->id;
+		somgr->ecb(somgr->ud, soid);
+		somgr_free_so(somgr, so);
+	} while(1);
+
+	do {
+		struct so_t* so = soqueue_pop(&somgr->writesos);
+		if (!so) break;
+		if (somgr_flush_so(somgr, so)) {
+			somgr_remove_so(somgr, so);
+		} else {
+			if (sbuf_cur(&so->wbuf) > 0) {
+				assert(so_get_state(so, SOS_WRITABLE) == 0);
+			} else {
+				if (somgr_mod_so(somgr, so, 0))
+					somgr_remove_so(somgr, so);
+			}
+		}
+	} while (1);
+
+	en = epoll_wait(somgr->ep, evs, 1024, wms);
 	for (; i < en; i++) {
 		struct so_t* so = evs[i].data.ptr;
 		if (evs[i].events & (EPOLLHUP | EPOLLERR)) {
@@ -210,14 +234,6 @@ void somgr_runonce(struct somgr_t* somgr, int wms) {
 			somgr_proc_rw(somgr, so);
 		}
 	}
-
-	do {
-		struct so_t* so = soqueue_pop(&somgr->badsos);
-		if (!so) break;
-		uint32_t soid = so->id;
-		somgr->ecb(somgr->ud, soid);
-		somgr_free_so(somgr, so);
-	} while(1);
 }
 
 int somgr_write(struct somgr_t* somgr, int32_t id, char* data, uint32_t dlen) {
@@ -228,7 +244,7 @@ int somgr_write(struct somgr_t* somgr, int32_t id, char* data, uint32_t dlen) {
 	uint32_t fz = sbuf_freesz(&so->wbuf);
 	if (fz < dlen) {
 		if (so_get_state(so, SOS_WRITABLE)) {
-			if (0 != somgr_flush(somgr, so))
+			if (0 != somgr_flush_so(somgr, so))
 				goto fail1;
 		}
 		fz = sbuf_freesz(&so->wbuf);
@@ -242,6 +258,8 @@ int somgr_write(struct somgr_t* somgr, int32_t id, char* data, uint32_t dlen) {
 	if (!so_get_state(so, SOS_EV_WRITE)) 
 		if (somgr_mod_so(somgr, so, 1))
 			goto fail3;
+	if (!so->curq)
+		soqueue_push(&somgr->writesos, so);
 	return 0;
 fail1:
 fail2:
@@ -255,9 +273,11 @@ int somgr_kick(struct somgr_t* somgr, int32_t id) {
 	struct so_t* so = somgr->sos[id];
 	if (so_get_state(so, SOS_BAD)) return -2;
 	if (so_get_state(so, SOS_FREE)) return -3;
+	somgr_flush_so(somgr, so);
 	somgr_remove_so(somgr, so);
 	return 0;
 }
+
 /********************************************************************************************************************/
 void somgr_expand_sos(struct somgr_t* somgr) {
 	uint32_t sosn = somgr->sosn == 0? 2 : somgr->sosn * 2;
@@ -288,6 +308,7 @@ struct so_t* somgr_alloc_so(struct somgr_t* somgr) {
 		somgr_expand_sos(somgr);
 		so = soqueue_pop(&somgr->freesos);
 	}
+	so->state = 0;
 	return so;
 }
 
@@ -295,7 +316,7 @@ void somgr_remove_so(struct somgr_t* somgr, struct so_t* so) {
 	if (so_get_state(so, SOS_BAD)) return;
 	if (so->curq) {
 		assert(so->curq == &somgr->writesos);
-		soq_
+		soqueue_erase(so);
 	}
 	so_set_state(so, SOS_BAD);
 	struct epoll_event ev;
@@ -330,6 +351,8 @@ int somgr_mod_so(struct somgr_t* somgr, struct so_t* so, int w) {
 		return -1;
 	if (w)
 		so_set_state(so, SOS_EV_WRITE);
+	else 
+		so->state &= ~(1<<SOS_EV_WRITE);
 	return 0;
 }
 

@@ -1,6 +1,8 @@
 #include "gate.h"
 #include "gsq.h"
 #include "common/somgr/somgr.h"
+#include "common/timer/timer.h"
+
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
@@ -39,7 +41,10 @@ void gate_delete(struct gate_t * gate) {
 }
 
 void gate_runonce (struct gate_t * gate) {
-	somgr_runonce(gate->somgr, 100);
+	uint64_t stm = time_currentms();
+	uint64_t ctm = 0;
+	uint32_t count = 0;
+	uint32_t sleepms = 100;
 	do {
 		int type = 0;
 		void * packet = gsq_pop(gate->s2g_queue, &type);
@@ -62,7 +67,15 @@ void gate_runonce (struct gate_t * gate) {
 			}
 		}
 		free (packet);
+		if (++count%1000 == 0) {
+			ctm = time_currentms();
+			if (ctm - stm >= 100) {
+				sleepms = 0;
+				break;
+			}
+		}
 	} while(1);
+	somgr_runonce(gate->somgr, sleepms);
 }
 
 int tcp_accepted(void *ud, int lid, int nid) {	//tcp 建立时回调
