@@ -78,7 +78,6 @@ void timer_destroy(struct timer_t * timer) {
 	uint32_t i = 0;
 	for (; i < timer->objpooln; ++i)
 		free(timer->objpool[i]);
-
 	free(timer->objpool);
 	free(timer->ticklist);
 	free(timer);
@@ -105,7 +104,6 @@ int timer_del(struct timer_t * timer, uint32_t tid) {
 		tobj->repeat = 1;			//标记成最后一次, 架设完会释放这个节点
 		return 0;
 	} 
-
 	assert(tobj->container);
 	uq_erase(tobj->container, tobj);		//从时间点上把它移出
 	uq_addtail(&timer->freelist, tobj);	//并放回用户池备用
@@ -118,21 +116,18 @@ void timer_tick(struct timer_t * timer) {
 	uint32_t num = tick->objn;
 	while (num-- > 0) {
 		struct tobj_t * tobj = uq_pophead(tick);
-		if (NULL == tobj) break;
-		func_timer_callback cb = tobj->cb;
-		func_timer_callback ud = tobj->ud;
-		uint32_t tid = tobj->id;		
-		timer->ticking = tid;						//设置为正在触发状态
+		if (NULL == tobj) break;	
+		timer->ticking = tobj->id;						//设置为正在触发状态
 		int erased = 0;
-		//tobj->cb(tobj->ud, tobj->id);
-		if (tobj->repeat > 0 && --tobj->repeat == 0) {	//使用结束回收该用户节点
+		if (tobj->repeat > 0 && --tobj->repeat == 0) 
+			erased = 1;
+		tobj->cb(tobj->ud, tobj->id, erased);
+		if (erased) {
 			tobj->cb = NULL;
 			uq_addtail(&timer->freelist, tobj);
-			erased = 1;
-		} else {											//暂不回收
+		} else {
 			add_obj_raw(timer, tobj, tobj->timeout, tobj->timeout, tobj->repeat, tobj->ud, tobj->cb);
 		}
-		cb(ud, tid, erased);
 	}
 	timer->current = (++timer->current)%timer->ticklistn;
 	timer->ticking = 0;
@@ -258,7 +253,6 @@ void expand_objpool(struct timer_t * timer) {	//扩展用户节点数量
 	}
 	timer->objpooln = pooln;
 }
-
 
 uint64_t time_currentms() {
 	struct timeval tv;
