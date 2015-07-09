@@ -44,7 +44,7 @@ void gate_runonce (struct gate_t * gate) {
 	uint64_t stm = time_currentms();
 	uint64_t ctm = 0;
 	uint32_t count = 0;
-	uint32_t sleepms = 100;
+	int sleepms = 100;
 	do {
 		int type = 0;
 		void * packet = gsq_pop(gate->s2g_queue, &type);
