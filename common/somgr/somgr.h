@@ -10,7 +10,7 @@ struct somgr_t;
 
 struct somgr_t* somgr_new(void* ud, soacb a, sorcb r, soecb e);
 void somgr_destroy(struct somgr_t* somgr);
-int  somgr_listen(struct somgr_t* somgr, const char* ip, int port);
-int  somgr_write(struct somgr_t* somgr, int32_t id, char* data, uint32_t dlen);
-int  somgr_kick(struct somgr_t* somgr, int32_t id);
+int somgr_listen(struct somgr_t* somgr, const char* ip, int port);
+int somgr_write(struct somgr_t* somgr, int32_t id, char* data, uint32_t dlen);
+int somgr_kick(struct somgr_t* somgr, int32_t id);
 #endif

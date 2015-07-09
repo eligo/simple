@@ -1,23 +1,23 @@
-gTimer = gTimer or {}
+--全局定时器
 
-function gTimer:init()
+g_timer = g_timer or {}
+
+function g_timer:init()
 	self._cbs = {}
 end
 
-function gTimer:timeout(ticks, repeatn, func, ...)
+function g_timer:timeout(ticks, repeatn, func, ...)
 	assert(type(func) == 'function')
 	local tid = c_interface.c_timeout(ticks, repeatn, repeatn or 1)
 	self._cbs[tid] = {func, ...}
-	print("tid is", tid)
 	return tid
 end
 
-function gTimer:onTimer(tid, erased)
+function g_timer:onTimer(tid, erased)
 	local cb = self._cbs[tid]
 	if cb then
 		if erased ~= 0 then
 			self._cbs[tid] = nil
-			self:timeout(10, 1, cb[1], 'haha'..tid)
 		end
 		cb[1](unpack(cb, 2))
 	else
@@ -25,6 +25,6 @@ function gTimer:onTimer(tid, erased)
 	end
 end
 
-function gTimer:erase(tid)
+function g_timer:erase(tid)
 	--todo
 end
