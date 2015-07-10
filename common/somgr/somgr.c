@@ -343,7 +343,7 @@ int somgr_mod_so(struct somgr_t* somgr, struct so_t* so, int w) {
 	struct epoll_event ev;
 	memset(&ev, 0, sizeof(ev));
 	ev.events |= EPOLLERR | EPOLLHUP | EPOLLIN;
-	if (w) {//0 == so_getstate(so, SOS_WRITABLE)) {
+	if (w) {
 		ev.events |= EPOLLOUT;
 	}
 	ev.data.ptr = so;

@@ -45,7 +45,7 @@ void gate_runonce (struct gate_t * gate) {
 	uint64_t stm = time_currentms();
 	uint64_t ctm = 0;
 	uint32_t count = 0;
-	int sleepms = 100;
+	int sleepms = 50;
 	do {
 		int type = 0;
 		void * packet = gsq_pop(gate->s2g_queue, &type);
@@ -59,7 +59,6 @@ void gate_runonce (struct gate_t * gate) {
 			}
 			case S2G_TCP_CLOSE: {
 				struct s2g_tcp_data_t * ev = (struct s2g_tcp_data_t*)packet;
-				//tcp_flush(gate->reactor, ev->sid);
 				somgr_kick(gate->somgr, ev->sid);
 				break;
 			}
@@ -70,7 +69,7 @@ void gate_runonce (struct gate_t * gate) {
 		FREE (packet);
 		if (++count%1000 == 0) {
 			ctm = time_currentms();
-			if (ctm - stm >= 100) {
+			if (ctm - stm >= 50) {
 				sleepms = 0;
 				break;
 			}
@@ -81,7 +80,6 @@ void gate_runonce (struct gate_t * gate) {
 
 int tcp_accepted(void *ud, int lid, int nid) {	//tcp 建立时回调
 	struct gate_t * gate = (struct gate_t *)ud;
-	//tcp_ev_cb(gate->reactor, nid, gate, tcp_readed, tcp_errored, NULL, NULL);
 	struct g2s_tcp_accepted_t * ev = (struct g2s_tcp_accepted_t*)MALLOC(sizeof(*ev));
 	ev->sid = nid;
 	gsq_push(gate->g2s_queue, G2S_TCP_ACCEPTED, ev);
