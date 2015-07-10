@@ -18,6 +18,7 @@ struct g2s_tcp_accepted_t {
 
 struct g2s_tcp_closed_t {
 	int sid;
+	int ud;
 };
 
 struct g2s_tcp_data_t {
@@ -42,7 +43,8 @@ struct s2g_tcp_close_t {
 };
 
 struct s2g_tcp_connect {
-	int sid;
+	char* ip;
+	int port;
 	int ud;
 };
 

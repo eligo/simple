@@ -16,10 +16,12 @@ static void l_on_tcp_accepted(struct service_t * service, struct g2s_tcp_accepte
 static void l_on_tcp_closed(struct service_t * service, struct g2s_tcp_closed_t * ev);
 static void l_on_tcp_data(struct service_t * service, struct g2s_tcp_data_t * ev);
 static void l_on_timer(struct service_t * service, uint32_t tid, int erased);
+static void l_on_tcp_connected(struct service_t * service, struct g2s_tcp_connected_t * ev);
 
-static int c_send (struct lua_State * lparser);
-static int c_close (struct lua_State * lparser);
-static int c_timeout (struct lua_State * lparser);
+static int c_connect(struct lua_State * lparser);
+static int c_send(struct lua_State * lparser);
+static int c_close(struct lua_State * lparser);
+static int c_timeout(struct lua_State * lparser);
 
 static void time_cb (void * ud, uint32_t tid, int erased);
 
@@ -44,6 +46,7 @@ struct service_t * service_new(struct gsq_t * g2s_queue, struct gsq_t * s2g_queu
 		lua_pushlightuserdata (service->lparser, (void *)service);
 		lua_settable(service->lparser, LUA_REGISTRYINDEX);
 		struct luaL_Reg c_interface[] = {
+			{"c_connect", c_connect},
 			{"c_send", c_send},
 			{"c_close", c_close},
 			{"c_timeout", c_timeout},
@@ -105,6 +108,11 @@ void service_runonce(struct service_t * service) {
 				FREE(ev->data);
 				break;
 			}
+			case G2S_TCP_CONNECTED: {
+				struct g2s_tcp_connected_t* ev = (struct g2s_tcp_connected_t*)packet;
+				l_on_tcp_connected(service, ev);
+				break;
+			}
 			default: {
 				assert(0);
 			}
@@ -129,13 +137,25 @@ void l_on_tcp_accepted (struct service_t * service, struct g2s_tcp_accepted_t * 
 	lua_settop(lparser, st);
 }
 
+void l_on_tcp_connected (struct service_t * service, struct g2s_tcp_connected_t * ev) {
+	struct lua_State * lparser = service->lparser;
+	int st = lua_gettop(lparser);
+	lua_pushcfunction(lparser, lua_error_cb);
+	lua_getglobal(lparser, "c_onTcpConnected");
+	lua_pushnumber(lparser, ev->sid);
+	lua_pushnumber(lparser, ev->ud);
+	lua_pcall(lparser, 2, 0, -4);
+	lua_settop(lparser, st);
+}
+
 void l_on_tcp_closed (struct service_t * service, struct g2s_tcp_closed_t * ev) {
 	struct lua_State * lparser = service->lparser;
 	int st = lua_gettop(lparser);
 	lua_pushcfunction(lparser, lua_error_cb);
 	lua_getglobal(lparser, "c_onTcpClosed");
 	lua_pushnumber(lparser, ev->sid);
-	lua_pcall(lparser, 1, 0, -3);
+	lua_pushnumber(lparser, ev->ud);
+	lua_pcall(lparser, 2, 0, -4);
 	lua_settop(lparser, st);
 }
 
@@ -168,6 +188,22 @@ static struct service_t * get_service(struct lua_State * lparser) {
 	struct service_t * service = (struct service_t *)lua_touserdata(lparser, -1);
 	assert(service != NULL);
 	return service;
+}
+
+int c_connect(struct lua_State * lparser) {
+	size_t len = 0;
+	struct service_t * service = get_service(lparser);
+
+	int ui = luaL_checkinteger(lparser, 1);
+	const char* ip = luaL_checklstring(lparser, 2, &len);
+	int port = luaL_checkinteger(lparser, 3);
+	struct s2g_tcp_connect* ev = (struct s2g_tcp_connect*)MALLOC(sizeof(*ev));
+	ev->ud = ui;
+	ev->ip = (char*)MALLOC(len+1);
+	strcpy(ev->ip, ip);
+	ev->port = port;
+	gsq_push (service->s2g_queue, S2G_TCP_CONNECT, ev);
+	return 0;
 }
 
 int c_send (struct lua_State * lparser) {

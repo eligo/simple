@@ -10,13 +10,33 @@ g_msgHandlers = {}				--协议处理
 
 ---------------------------------------------------------framework event---------------------------------------------------------
 function c_onTcpAccepted(sid)	--框架事件通知
+	print("c_onTcpAccepted", sid)
 end
 
-function c_onTcpClosed(sid)		--框架事件通知
+function c_onTcpConnected(sid, ud)
+	print("c_onTcpConnected", sid, ud)
+	
+	g_timer:timeout(1, -1, 
+								function(...)
+									--c_interface.c_send(sid, string.format("hello world aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa %s\r\n", os.time()))
+									for i = 1, 10000 do
+										c_interface.c_send(sid, string.format("helloworldhelloworld %s\r\n",os.time()))
+									end
+								end)
 end
 
+function c_onTcpClosed(sid, ud)		--框架事件通知
+	print("c_onTcpClosed", sid, ud)
+end
+local i = 0
 function c_onTcpData(sid, str)	--框架事件通知
-	responser._sid = sid
+	i = i + 1
+	if i%10000 == 0 then
+		print("recv", str, i)
+	end
+	--c_interface.c_send(sid, string.format("hello world aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa %s\r\n", os.time()))
+	--print("recv", str)
+	--[[responser._sid = sid
 	local ok, package = pcall(json.decode, str)
 	if not ok then
 		responser:write("server only accept json and end with \\r\\n !!!			")
@@ -33,7 +53,7 @@ function c_onTcpData(sid, str)	--框架事件通知
 		handler(package, responser)
 	else
 		responser:write(string.format("no handle for op:%s !!!			", package.op))
-	end
+	end]]
 end
 
 function c_onTimer(tid, erased)
@@ -60,6 +80,6 @@ function(...)
 end,
 1
 )]]
-
+c_interface.c_connect(111, "0.0.0.0", 9999)
 ---------------------------------------------------------other require---------------------------------------------------------
 require ("scripts.handle.test_handle")		--协议处理

@@ -28,6 +28,7 @@ struct somgr_t {
 	soacb acb;
 	sorcb rcb;
 	soecb ecb;
+	soccb ccb;
 };
 
 static void somgr_expand_sos(struct somgr_t* somgr);
@@ -36,12 +37,16 @@ void somgr_remove_so(struct somgr_t* somgr, struct so_t* so);
 int somgr_add_so(struct somgr_t* somgr, struct so_t* so);
 int somgr_mod_so(struct somgr_t* somgr, struct so_t* so, int w);
 void somgr_free_so(struct somgr_t* somgr, struct so_t* so);
-static int so_setnoblock(struct so_t* so) ;
+static int fd_setnoblock(int fd);
+static int so_setnoblock(struct so_t* so);
 static void so_setstate(struct so_t* so, int sta);
-static uint32_t so_getstate(struct so_t* so, int sta);
+static uint32_t so_hasstate(struct so_t* so, int sta);
+static void so_clearstate(struct so_t* so, int sta);
 
-struct somgr_t* somgr_new(void* ud, soacb a, sorcb r, soecb e) {
-	if (!a || !r || !e) return NULL;
+struct somgr_t* somgr_new(void* ud, soacb a, sorcb r, soecb e, soccb c) {
+	if (!a || !r || !e || !c) 
+		return NULL;
+	
 	int ep = epoll_create(1024);
 	if (ep <= 0) return NULL;
 	struct somgr_t* somgr = (struct somgr_t*)MALLOC(sizeof(*somgr));
@@ -52,6 +57,7 @@ struct somgr_t* somgr_new(void* ud, soacb a, sorcb r, soecb e) {
 		somgr->acb = a;
 		somgr->rcb = r;
 		somgr->ecb = e;
+		somgr->ccb = c;
 	}
 	return somgr;
 }
@@ -63,7 +69,8 @@ void somgr_destroy(struct somgr_t* somgr) {
 int somgr_listen(struct somgr_t* somgr, const char* ip, int port) {
 	int err = 0;
 	int fd = socket(AF_INET, SOCK_STREAM, IPPROTO_IP);
-	if (fd <= 0) return -6;
+	if (fd <= 0) 
+		return -6;
 
 	struct sockaddr_in addr;
 	bzero(&addr, sizeof(addr));  
@@ -71,11 +78,11 @@ int somgr_listen(struct somgr_t* somgr, const char* ip, int port) {
 	addr.sin_port = htons(port);  
 	addr.sin_addr.s_addr = inet_addr(ip);//INADDR_ANY;
 	int flag = 1;
-	if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &flag, sizeof(flag)) != 0) goto fail1;
-	if (0 != bind(fd,  (struct sockaddr *)&addr,  sizeof(struct sockaddr))) goto fail2;
-	if (listen(fd, 128) != 0) goto fail3;
+	if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &flag, sizeof(flag)) != 0) goto fail;
+	if (0 != bind(fd,  (struct sockaddr *)&addr,  sizeof(struct sockaddr))) goto fail;
+	if (listen(fd, 128) != 0) goto fail;
 	struct so_t* so = somgr_alloc_so(somgr);
-	if (!so) goto fail4;
+	if (!so) goto fail;
 	
 	so->fd = fd;
 	so_setstate(so, SOS_LISTEN);
@@ -84,12 +91,49 @@ int somgr_listen(struct somgr_t* somgr, const char* ip, int port) {
 		return -7;
 	}
 	return so->id;
-fail1: err = err !=0 ? err : -1;
-fail2: err = err !=0 ? err : -2;
-fail3: err = err !=0 ? err : -3;
-fail4: err = err !=0 ? err : -4;
+fail: 
+	err = err !=0 ? err : -1;
 	close(fd);
 	return err;
+}
+
+int somgr_connect(struct somgr_t* somgr, const char* ip, int port, int ud) {
+	int fd = socket(AF_INET, SOCK_STREAM, IPPROTO_IP);
+	if (0 > fd)	
+		return -1;
+
+	if (fd_setnoblock(fd)) 
+		goto fail;
+	
+	struct sockaddr_in addr;
+	bzero(&addr, sizeof(addr));  
+	addr.sin_family = AF_INET;  
+	addr.sin_port = htons(port);  
+	addr.sin_addr.s_addr = inet_addr(ip);//INADDR_ANY;
+	errno = 0;
+	int ret = connect(fd, (struct sockaddr *)(&addr), sizeof(struct sockaddr));
+	if (ret < 0) {
+		if(errno != EINPROGRESS)
+			goto fail;
+	}
+	else if (0 != ret)
+		goto fail;
+	
+	struct so_t* so = somgr_alloc_so(somgr);
+	if (!so) 
+		goto fail;
+	
+	so->fd = fd;
+	so_setstate(so, SOS_CONNECTTING);
+	if (somgr_add_so(somgr, so)) {
+		somgr_free_so(somgr, so);
+		goto fail;
+	}
+	so->ud = ud;
+	return so->id;
+fail:
+	close(fd);
+	return -2;
 }
 
 int somgr_flush_so(struct somgr_t* somgr, struct so_t* so) {
@@ -97,69 +141,93 @@ int somgr_flush_so(struct somgr_t* somgr, struct so_t* so) {
 	int wn = 0;
 dowrite:
 	dn = sbuf_cur(&so->wbuf);
-	if (dn == 0) 
+	if (dn == 0) {
+		if (so_hasstate(so, SOS_WRITABLE) && so_hasstate(so, SOS_EV_WRITE)) {
+			if (somgr_mod_so(somgr, so, 0))
+				goto fail;
+		}
 		return 0;
-	if (!so_getstate(so, SOS_WRITABLE) || 0 == dn) return 0;
+	}
+	
 	wn = write(so->fd, so->wbuf.ptr, dn);
 	if (wn > 0) {
 		assert(dn >= wn);
-		sbuf_readed(&so->wbuf, dn);
+		sbuf_readed(&so->wbuf, wn);
 		goto dowrite;
 	} else if (wn < 0) {
 		switch (errno) {
 			case EAGAIN:
-				so->state &= ~(1<<SOS_WRITABLE);
+				so_clearstate(so, SOS_WRITABLE);
 				if (somgr_mod_so(somgr, so, 1))
-					goto fail3;
+					goto fail;
 				return 0;
 			case EINTR:
 				goto dowrite;
 			default:
-				goto fail1;
+				goto fail;
 		}
-	} else goto fail2;
-fail1:
-fail2:
-fail3:
+	} else goto fail;
+fail:
 	return -1;
 }
 
-void somgr_proc_rw(struct somgr_t* somgr, struct so_t* so) {
+void somgr_proc_connected(struct somgr_t* somgr, struct so_t* so) {
+	int err = -1;
+	socklen_t len = sizeof(err);
+	if (0 == getsockopt(so->fd, SOL_SOCKET, SO_ERROR, &err, &len) && err == 0) {
+		if (somgr_mod_so(somgr, so, 0))
+			goto fail;
+	} else 
+		goto fail;
+
+	so_setstate(so, SOS_WRITABLE);
+	so_clearstate(so, SOS_CONNECTTING);
+	somgr->ccb(somgr->ud, so->id, so->ud);
+	return;
+fail:
+	somgr_remove_so(somgr, so);
+}
+
+
+void somgr_proc_rw(struct somgr_t* somgr, struct so_t* so, unsigned ev) {
 	int rn = 0, pn = 0;
 	uint32_t fz = 0;
-	fz = sbuf_freesz(&so->rbuf);
-	if (fz == 0) {
-		if (sbuf_expand(&so->rbuf, so->rbuf.cap == 0? 1024 : so->rbuf.cap))
-			goto fail1;
+	if (ev & EPOLLIN) {
 		fz = sbuf_freesz(&so->rbuf);
-	}
-	rn = read(so->fd, sbuf_cptr(&so->rbuf), fz);
-	if (rn > 0) {
-		assert(rn <= fz);
-		sbuf_writed(&so->rbuf, rn);
-		pn = somgr->rcb(somgr->ud, so->id, so->rbuf.ptr, so->rbuf.cur);
-		if (pn < 0 || pn > so->rbuf.cur)  goto fail1;
-		sbuf_readed(&so->rbuf, pn);
-		if (so_getstate(so, SOS_BAD)) goto fail2;
-		goto dowrite;
-	} else if (rn < 0) {
-		switch (errno) {
-			case EAGAIN:
-			case EINTR:
-				return;
-			default:
-				goto fail3;
+		if (fz == 0) {
+			if (sbuf_expand(&so->rbuf, so->rbuf.cap == 0? 1024 : so->rbuf.cap))
+				goto fail;
+			fz = sbuf_freesz(&so->rbuf);
 		}
-	} else goto fail4;
-dowrite:
-	if (0 != somgr_flush_so(somgr, so))
-		goto fail5;
+		rn = read(so->fd, sbuf_cptr(&so->rbuf), fz);
+		if (rn > 0) {
+			assert(rn <= fz);
+			sbuf_writed(&so->rbuf, rn);
+			pn = somgr->rcb(somgr->ud, so->id, so->rbuf.ptr, so->rbuf.cur);
+			if (pn < 0 || pn > so->rbuf.cur)  
+				goto fail;
+			sbuf_readed(&so->rbuf, pn);
+			if (so_hasstate(so, SOS_BAD)) 
+				goto fail;
+		} else if (rn < 0) {
+			switch (errno) {
+				case EAGAIN:
+				case EINTR:
+					return;
+				default:
+					goto fail;
+			}
+		} else goto fail;
+	}
+
+	if (ev & EPOLLOUT) {
+		so_setstate(so, SOS_WRITABLE);
+		if (0 != somgr_flush_so(somgr, so))
+			goto fail;
+	}
+			
 	return;
-fail1:
-fail2:
-fail3:
-fail4:
-fail5:
+fail:
 	somgr_remove_so(somgr, so);
 }
 
@@ -205,7 +273,7 @@ void somgr_runonce(struct somgr_t* somgr, int wms) {
 		struct so_t* so = soqueue_pop(&somgr->badsos);
 		if (!so) break;
 		uint32_t soid = so->id;
-		somgr->ecb(somgr->ud, soid);
+		somgr->ecb(somgr->ud, soid, so->ud);
 		somgr_free_so(somgr, so);
 	} while(1);
 
@@ -216,7 +284,7 @@ void somgr_runonce(struct somgr_t* somgr, int wms) {
 			somgr_remove_so(somgr, so);
 		} else {
 			if (sbuf_cur(&so->wbuf) > 0) {
-				assert(so_getstate(so, SOS_WRITABLE) == 0);
+				assert(so_hasstate(so, SOS_WRITABLE) == 0);
 			} else {
 				if (somgr_mod_so(somgr, so, 0))
 					somgr_remove_so(somgr, so);
@@ -229,10 +297,14 @@ void somgr_runonce(struct somgr_t* somgr, int wms) {
 		struct so_t* so = evs[i].data.ptr;
 		if (evs[i].events & (EPOLLHUP | EPOLLERR)) {
 			somgr_remove_so(somgr, so);
-		} else if (so_getstate(so, SOS_LISTEN)) {
+		} else if (so_hasstate(so, SOS_LISTEN)) {
 			somgr_proc_accept(somgr, so);
 		} else {
-			somgr_proc_rw(somgr, so);
+			if (so_hasstate(so, SOS_CONNECTTING)) {
+				assert(evs[i].events & EPOLLOUT);
+				somgr_proc_connected(somgr, so);
+			} else
+				somgr_proc_rw(somgr, so, evs[i].events);
 		}
 	}
 }
@@ -241,30 +313,32 @@ int somgr_write(struct somgr_t* somgr, int32_t id, char* data, uint32_t dlen) {
 	if (dlen == 0) return 0;
 	if (id < 1 || id >= somgr->sosn) return -1;
 	struct so_t* so = somgr->sos[id];
-	if (so_getstate(so, SOS_BAD | SOS_LISTEN | SOS_FREE)) return -2;
+	if (so_hasstate(so, SOS_BAD | SOS_LISTEN | SOS_FREE)) return -2;
 	uint32_t fz = sbuf_freesz(&so->wbuf);
 	if (fz < dlen) {
-		if (so_getstate(so, SOS_WRITABLE)) {
+		if (so_hasstate(so, SOS_WRITABLE)) {
 			if (0 != somgr_flush_so(somgr, so))
-				goto fail1;
+				goto fail;
 		}
 		fz = sbuf_freesz(&so->wbuf);
 		if (fz < dlen) {
 			if (sbuf_expand(&so->wbuf, dlen - fz))
-				goto fail2;
+				goto fail;
 		}
 	}
-	memcpy(so->wbuf.ptr, data, dlen);
+	memcpy(sbuf_cptr(&so->wbuf), data, dlen);
 	sbuf_writed(&so->wbuf, dlen);
-	if (!so_getstate(so, SOS_EV_WRITE)) 
+	if (so_hasstate(so, SOS_WRITABLE)) {
+		if (!so->curq)
+			soqueue_push(&somgr->writesos, so);
+	} else if (!so_hasstate(so, SOS_EV_WRITE)) {
+		if (so->curq)
+			soqueue_erase(so);
 		if (somgr_mod_so(somgr, so, 1))
-			goto fail3;
-	if (!so->curq)
-		soqueue_push(&somgr->writesos, so);
+			goto fail;
+	} 
 	return 0;
-fail1:
-fail2:
-fail3:
+fail:
 	somgr_remove_so(somgr, so);
 	return -1;
 }
@@ -272,8 +346,8 @@ fail3:
 int somgr_kick(struct somgr_t* somgr, int32_t id) {
 	if (id < 1 || id >= somgr->sosn) return -1;
 	struct so_t* so = somgr->sos[id];
-	if (so_getstate(so, SOS_BAD)) return -2;
-	if (so_getstate(so, SOS_FREE)) return -3;
+	if (so_hasstate(so, SOS_BAD)) return -2;
+	if (so_hasstate(so, SOS_FREE)) return -3;
 	somgr_flush_so(somgr, so);
 	somgr_remove_so(somgr, so);
 	return 0;
@@ -313,7 +387,7 @@ struct so_t* somgr_alloc_so(struct somgr_t* somgr) {
 }
 
 void somgr_remove_so(struct somgr_t* somgr, struct so_t* so) {
-	if (so_getstate(so, SOS_BAD)) return;
+	if (so_hasstate(so, SOS_BAD)) return;
 	if (so->curq) {
 		assert(so->curq == &somgr->writesos);
 		soqueue_erase(so);
@@ -321,18 +395,22 @@ void somgr_remove_so(struct somgr_t* somgr, struct so_t* so) {
 	so_setstate(so, SOS_BAD);
 	struct epoll_event ev;
 	memset(&ev, 0, sizeof(ev));
-	int err = epoll_ctl(somgr->ep, EPOLL_CTL_DEL, so->fd, &ev);
-	assert(err == 0);
+	epoll_ctl(somgr->ep, EPOLL_CTL_DEL, so->fd, &ev);
 	soqueue_push(&somgr->badsos, so);
 }
 
 int somgr_add_so(struct somgr_t* somgr, struct so_t* so) {
 	struct epoll_event ev;
 	memset(&ev, 0, sizeof(ev));
-	ev.events |= EPOLLERR | EPOLLHUP | EPOLLIN;
-	so_setstate(so, SOS_WRITABLE);
-	if (so_setnoblock(so)) 
-		return -1;
+	ev.events |= EPOLLERR | EPOLLHUP;
+	if (so_hasstate(so, SOS_CONNECTTING)) {
+		ev.events |= EPOLLOUT;
+	} else {
+		ev.events |= EPOLLIN;
+		so_setstate(so, SOS_WRITABLE);
+		if (so_setnoblock(so)) 
+			return -1;
+	}
 	ev.data.ptr = so;
 	if (epoll_ctl(somgr->ep, EPOLL_CTL_ADD, so->fd, &ev))
 		return -2;
@@ -352,7 +430,7 @@ int somgr_mod_so(struct somgr_t* somgr, struct so_t* so, int w) {
 	if (w)
 		so_setstate(so, SOS_EV_WRITE);
 	else 
-		so->state &= ~(1<<SOS_EV_WRITE);
+		so_clearstate(so, SOS_EV_WRITE);
 	return 0;
 }
 
@@ -368,10 +446,15 @@ void somgr_free_so(struct somgr_t* somgr, struct so_t* so) {
 	soqueue_push(&somgr->freesos, so);
 }
 
-int so_setnoblock(struct so_t* so) {
-	int flag = fcntl(so->fd, F_GETFL, 0);
+int fd_setnoblock(int fd) {
+	int flag = fcntl(fd, F_GETFL, 0);
 	if (-1 == flag) return -1;
-	fcntl(so->fd, F_SETFL, flag | O_NONBLOCK);
+	fcntl(fd, F_SETFL, flag | O_NONBLOCK);
+	return 0;
+}
+
+int so_setnoblock(struct so_t* so) {
+	return fd_setnoblock(so->fd);
 	return 0;
 }
 
@@ -379,6 +462,10 @@ void so_setstate(struct so_t* so, int sta) {
 	so->state |= 1<<sta;
 }
 
-uint32_t so_getstate(struct so_t* so, int sta) {
+uint32_t so_hasstate(struct so_t* so, int sta) {
 	return so->state & 1<<sta;
+}
+
+void so_clearstate(struct so_t* so, int sta) {
+	so->state &= ~(1<<sta);
 }

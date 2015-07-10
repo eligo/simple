@@ -14,20 +14,18 @@ static void signal_handler(int signal); 	//进程信号回调
 static int _stop = 0;	//是否结束标志
 
 int main() {
-	//timer_test(); return 1;
-	//设置进程信号处理
-	signal(SIGPIPE,SIG_IGN);
 	sigset_t old_mask;
 	sigset_t new_mask;
+	signal(SIGPIPE,SIG_IGN);	//忽略该信号
 	sigfillset(&new_mask);
 	sigdelset(&new_mask, 2);
 	sigdelset(&new_mask, 15);
 	sigdelset(&new_mask, SIGSEGV);
 	pthread_sigmask(SIG_BLOCK, &new_mask, &old_mask);
-	signal(2, signal_handler);
-	signal(15, signal_handler);
-	signal(SIGTERM, signal_handler);
-	signal(SIGSEGV, signal_handler);
+	signal(2, signal_handler);//设置进程信号处理
+	signal(15, signal_handler);//设置进程信号处理
+	signal(SIGTERM, signal_handler);//设置进程信号处理
+	signal(SIGSEGV, signal_handler);//设置进程信号处理
 
 	pthread_t gate_thread;
 	pthread_t service_thread;
@@ -62,7 +60,7 @@ int main() {
 	return 0;							//程序结束
 }
 
-void * gate_runable(void * ptr) {				//驱动 gate 进行工作
+void* gate_runable(void * ptr) {				//驱动 gate 进行工作
 	struct gate_t * gate = (struct gate_t *) ptr;
 	do {
 		gate_runonce(gate);
@@ -72,7 +70,7 @@ void * gate_runable(void * ptr) {				//驱动 gate 进行工作
 	return NULL;
 }
 
-void * service_runable(void * ptr) {			//驱动 service 进行工作
+void* service_runable(void * ptr) {			//驱动 service 进行工作
 	struct service_t * service = (struct service_t *) ptr;
 	do {
 		service_runonce(service);
@@ -85,4 +83,4 @@ void * service_runable(void * ptr) {			//驱动 service 进行工作
 
 void signal_handler(int signal) {
 	_stop = 1;
-}//aaa aaa
+}

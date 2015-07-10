@@ -15,12 +15,14 @@ struct gate_t {
 };
 
 static int tcp_accepted(void *ud, int lid, int nid);
-static int tcp_errored (void * ud, int id);
+static int tcp_errored (void * ud, int id, int ui);
 static int tcp_readed (void * ud, int id, char * data, int len);
+static int tcp_connected (void* ud, int id, int ui); 
+static void notify_so_error(struct gate_t* gate, int id, int ud);
 
 struct gate_t * gate_new(int port, struct gsq_t * g2s_queue, struct gsq_t * s2g_queue) {
 	struct gate_t* gate = (struct gate_t *) MALLOC (sizeof(*gate));
-	struct somgr_t* somgr = somgr_new(gate, tcp_accepted, tcp_readed, tcp_errored);
+	struct somgr_t* somgr = somgr_new(gate, tcp_accepted, tcp_readed, tcp_errored, tcp_connected);
 	if (0 >= somgr_listen(somgr, "0.0.0.0", port)) {	//端口侦听失败
 		fprintf(stderr, "listen fail\n");
 		somgr_destroy(somgr);
@@ -52,14 +54,23 @@ void gate_runonce (struct gate_t * gate) {
 		if (!packet) break;
 		switch (type) {
 			case S2G_TCP_DATA: {
-				struct s2g_tcp_data_t * ev = (struct s2g_tcp_data_t*)packet;
-				somgr_write(gate->somgr, ev->sid, ev->data, ev->dlen);
+				struct s2g_tcp_data_t* ev = (struct s2g_tcp_data_t*)packet;
+				int err = somgr_write(gate->somgr, ev->sid, ev->data, ev->dlen);
+				assert(err == 0);
 				FREE(ev->data);
 				break;
 			}
 			case S2G_TCP_CLOSE: {
-				struct s2g_tcp_data_t * ev = (struct s2g_tcp_data_t*)packet;
+				struct s2g_tcp_close_t* ev = (struct s2g_tcp_close_t*)packet;
 				somgr_kick(gate->somgr, ev->sid);
+				break;
+			}
+			case S2G_TCP_CONNECT: {
+				struct s2g_tcp_connect* ev = (struct s2g_tcp_connect*)packet;
+				int id = somgr_connect(gate->somgr, ev->ip, ev->port, ev->ud);
+				if (id <= 0)
+					notify_so_error(gate, 0, ev->ud);
+				FREE(ev->ip);
 				break;
 			}
 			default: {
@@ -86,11 +97,24 @@ int tcp_accepted(void *ud, int lid, int nid) {	//tcp 建立时回调
 	return 0;
 }
 
-int tcp_errored (void * ud, int id) {	//tcp 连接断开时回调
-	struct gate_t * gate = (struct gate_t *)ud;
+void notify_so_error(struct gate_t* gate, int id, int ui) {
 	struct g2s_tcp_closed_t * ev = (struct g2s_tcp_closed_t*)MALLOC(sizeof(*ev));
 	ev->sid = id;
+	ev->ud = ui;
 	gsq_push(gate->g2s_queue, G2S_TCP_CLOSED, ev);
+}
+
+int tcp_errored(void * ud, int id, int ui) {	//tcp 连接断开时回调
+	notify_so_error(ud, id, ui);
+	return 0;
+}
+
+int tcp_connected (void* ud, int id, int ui) {
+	struct gate_t * gate = (struct gate_t *)ud;
+	struct g2s_tcp_connected_t * ev = (struct g2s_tcp_connected_t*)MALLOC(sizeof(*ev));
+	ev->sid = id;
+	ev->ud = ui;
+	gsq_push(gate->g2s_queue, G2S_TCP_CONNECTED, ev);
 	return 0;
 }
 
