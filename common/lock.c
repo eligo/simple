@@ -1,12 +1,13 @@
 #include "lock.h"
 #include <stdlib.h>
+#include "global.h"
 
 struct lock_t {
 	int m;
 };
 
 struct lock_t * lock_new() {
-	struct lock_t * lo = (struct lock_t*) malloc (sizeof(*lo));
+	struct lock_t * lo = (struct lock_t*) MALLOC (sizeof(*lo));
 	if (lo)
 		lo->m = 0;
 	return lo;
@@ -14,7 +15,7 @@ struct lock_t * lock_new() {
 
 void lock_delete(struct lock_t * lo) {
 	if (lo)
-		free(lo);
+		FREE(lo);
 }
 
 void lock_lock(struct lock_t * lo) {

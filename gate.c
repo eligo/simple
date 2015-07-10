@@ -2,6 +2,7 @@
 #include "gsq.h"
 #include "common/somgr/somgr.h"
 #include "common/timer/timer.h"
+#include "common/global.h"
 
 #include <stdlib.h>
 #include <assert.h>
@@ -18,12 +19,12 @@ static int tcp_errored (void * ud, int id);
 static int tcp_readed (void * ud, int id, char * data, int len);
 
 struct gate_t * gate_new(int port, struct gsq_t * g2s_queue, struct gsq_t * s2g_queue) {
-	struct gate_t* gate = (struct gate_t *) malloc (sizeof(*gate));
+	struct gate_t* gate = (struct gate_t *) MALLOC (sizeof(*gate));
 	struct somgr_t* somgr = somgr_new(gate, tcp_accepted, tcp_readed, tcp_errored);
 	if (0 >= somgr_listen(somgr, "0.0.0.0", port)) {	//端口侦听失败
 		fprintf(stderr, "listen fail\n");
 		somgr_destroy(somgr);
-		free (gate);
+		FREE (gate);
 		return NULL;
 	}
 	
@@ -36,7 +37,7 @@ struct gate_t * gate_new(int port, struct gsq_t * g2s_queue, struct gsq_t * s2g_
 void gate_delete(struct gate_t * gate) {
 	if (gate) {
 		somgr_destroy(gate->somgr);
-		free(gate);
+		FREE(gate);
 	}
 }
 
@@ -53,7 +54,7 @@ void gate_runonce (struct gate_t * gate) {
 			case S2G_TCP_DATA: {
 				struct s2g_tcp_data_t * ev = (struct s2g_tcp_data_t*)packet;
 				somgr_write(gate->somgr, ev->sid, ev->data, ev->dlen);
-				free(ev->data);
+				FREE(ev->data);
 				break;
 			}
 			case S2G_TCP_CLOSE: {
@@ -66,7 +67,7 @@ void gate_runonce (struct gate_t * gate) {
 				assert(0);
 			}
 		}
-		free (packet);
+		FREE (packet);
 		if (++count%1000 == 0) {
 			ctm = time_currentms();
 			if (ctm - stm >= 100) {
@@ -81,7 +82,7 @@ void gate_runonce (struct gate_t * gate) {
 int tcp_accepted(void *ud, int lid, int nid) {	//tcp 建立时回调
 	struct gate_t * gate = (struct gate_t *)ud;
 	//tcp_ev_cb(gate->reactor, nid, gate, tcp_readed, tcp_errored, NULL, NULL);
-	struct g2s_tcp_accepted_t * ev = (struct g2s_tcp_accepted_t*) malloc(sizeof(*ev));
+	struct g2s_tcp_accepted_t * ev = (struct g2s_tcp_accepted_t*)MALLOC(sizeof(*ev));
 	ev->sid = nid;
 	gsq_push(gate->g2s_queue, G2S_TCP_ACCEPTED, ev);
 	return 0;
@@ -89,7 +90,7 @@ int tcp_accepted(void *ud, int lid, int nid) {	//tcp 建立时回调
 
 int tcp_errored (void * ud, int id) {	//tcp 连接断开时回调
 	struct gate_t * gate = (struct gate_t *)ud;
-	struct g2s_tcp_closed_t * ev = (struct g2s_tcp_closed_t*) malloc(sizeof(*ev));
+	struct g2s_tcp_closed_t * ev = (struct g2s_tcp_closed_t*)MALLOC(sizeof(*ev));
 	ev->sid = id;
 	gsq_push(gate->g2s_queue, G2S_TCP_CLOSED, ev);
 	return 0;
@@ -106,10 +107,10 @@ int tcp_readed (void * ud, int id, char * data, int len) {	//收到数据时回�
 				return readed;
 			if (data[cur+1] != '\n')
 				return -1;	//error occur
-			struct g2s_tcp_data_t * ev = (struct g2s_tcp_data_t*) malloc(sizeof(*ev));
+			struct g2s_tcp_data_t * ev = (struct g2s_tcp_data_t*)MALLOC(sizeof(*ev));
 			ev->sid = id;
 			ev->dlen = cur - start;
-			ev->data = (char*) malloc (len);
+			ev->data = (char*)MALLOC(len);
 			memcpy(ev->data, data + start, ev->dlen);
 			readed += cur - start + 2;
 			start = cur + 2;

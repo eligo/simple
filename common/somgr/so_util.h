@@ -25,6 +25,7 @@ struct so_t {
 	struct so_t* prev;
 	struct so_t* next;
 	struct soqueue_t* curq;
+	int32_t ud;
 };
 
 struct soqueue_t {

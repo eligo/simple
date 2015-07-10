@@ -1,6 +1,8 @@
 #include "service.h"
 #include "gsq.h"
 #include "common/timer/timer.h"
+#include "common/global.h"
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
@@ -30,7 +32,7 @@ struct service_t {
 };
 
 struct service_t * service_new(struct gsq_t * g2s_queue, struct gsq_t * s2g_queue) {
-	struct service_t * service = (struct service_t*) malloc(sizeof(*service));
+	struct service_t * service = (struct service_t*)MALLOC(sizeof(*service));
 	if (service) {
 		service->g2s_queue = g2s_queue;
 		service->s2g_queue = s2g_queue;
@@ -51,7 +53,7 @@ struct service_t * service_new(struct gsq_t * g2s_queue, struct gsq_t * s2g_queu
 		if (luaL_dofile(service->lparser, "scripts/interface.lua") != 0) {
 			fprintf(stderr, "%s\n", lua_tostring(service->lparser, -1));
 			lua_close(service->lparser);
-			free (service);
+			FREE (service);
 			return NULL;
 		}
 	}
@@ -62,7 +64,7 @@ void service_delete(struct service_t * service) {
 	if (service) {
 		if (service->lparser)
 			lua_close(service->lparser);
-		free(service);
+		FREE(service);
 	}
 }
 
@@ -100,14 +102,14 @@ void service_runonce(struct service_t * service) {
 			case G2S_TCP_DATA: {
 				struct g2s_tcp_data_t * ev = (struct g2s_tcp_data_t*)packet;
 				l_on_tcp_data(service, ev);
-				free(ev->data);
+				FREE(ev->data);
 				break;
 			}
 			default: {
 				assert(0);
 			}
 		}
-		free (packet);
+		FREE (packet);
 		if (++count%100 == 0)	//100是经验值可换成别的, 每处理100个业务包就处理一下定时器
 			service_tick(service, time_currentms()/100);	//处理定时器	
 	}
@@ -173,9 +175,9 @@ int c_send (struct lua_State * lparser) {
 	struct service_t * service = get_service(lparser);
 	const int sid = luaL_checkinteger(lparser, 1); 
 	const char * data = luaL_checklstring(lparser, 2, &len);
-	struct s2g_tcp_data_t * ev = (struct s2g_tcp_data_t*) malloc (sizeof(*ev));
+	struct s2g_tcp_data_t * ev = (struct s2g_tcp_data_t*)MALLOC(sizeof(*ev));
 	ev->sid = sid;
-	ev->data = (char*) malloc (len);
+	ev->data = (char*)MALLOC(len);
 	ev->dlen = len;
 	memcpy (ev->data, data, len);
 	gsq_push (service->s2g_queue, S2G_TCP_DATA, ev);
@@ -185,7 +187,7 @@ int c_send (struct lua_State * lparser) {
 int c_close (struct lua_State * lparser) {
 	struct service_t * service = get_service(lparser);
 	const int sid = luaL_checkinteger(lparser, 1); 
-	struct s2g_tcp_close_t * ev = (struct s2g_tcp_close_t*) malloc (sizeof(*ev));
+	struct s2g_tcp_close_t * ev = (struct s2g_tcp_close_t*)MALLOC(sizeof(*ev));
 	ev->sid = sid;
 	gsq_push (service->s2g_queue, S2G_TCP_CLOSE, ev);
 	return 0;

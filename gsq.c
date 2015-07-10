@@ -1,5 +1,6 @@
 #include "gsq.h"
 #include "common/lock.h"
+#include "common/global.h"
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
@@ -25,7 +26,7 @@ struct gsq_t {
 };
 
 static int queue_push(struct queue_t * queue, int type, void * ev) {
-	struct node_t * node = (struct node_t*) malloc(sizeof(*node));
+	struct node_t * node = (struct node_t*)MALLOC(sizeof(*node));
 	if (node) {
 		node->type = type;
 		node->ev = ev;
@@ -33,7 +34,7 @@ static int queue_push(struct queue_t * queue, int type, void * ev) {
 		if (queue->head == NULL) {
 			assert(queue->tail == NULL);
 			queue->head = node;
-			queue->tail = node;
+			queue->tail = node;	
 		} else {
 			assert(queue->tail);
 			assert(queue->tail->next == NULL);
@@ -80,7 +81,7 @@ static void queue_clear(struct queue_t * queue) {
 }
 
 struct gsq_t * gsq_new() {
-	struct gsq_t * gsq = (struct gsq_t *) malloc (sizeof(*gsq));
+	struct gsq_t * gsq = (struct gsq_t *)MALLOC(sizeof(*gsq));
 	memset(gsq, 0, sizeof(*gsq));
 	gsq->lock_i = lock_new();
 	gsq->lock_o = lock_new();

@@ -1,4 +1,6 @@
 #include "so_util.h"
+#include "../global.h"
+
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
@@ -7,7 +9,7 @@ int sbuf_expand(struct sbuf_t* sbuf, uint32_t need) {
 	uint32_t cap = sbuf->cap + need + 1024;
 	if (cap < sbuf->cap) return -1;	//回绕了
 	cap = cap/1024*1024;
-	char* ptr = realloc(sbuf->ptr, cap);
+	char* ptr = (char*)REALLOC(sbuf->ptr, cap);
 	if (!ptr) return -2;
 	sbuf->ptr = ptr;
 	sbuf->cap = cap;
@@ -43,7 +45,7 @@ int sbuf_writed(struct sbuf_t* sbuf, int n) {
 
 void sbuf_reset(struct sbuf_t* sbuf) {
 	if (sbuf->ptr)
-		free(sbuf->ptr);
+		FREE(sbuf->ptr);
 	sbuf->ptr = NULL;
 	sbuf->cur = 0;
 	sbuf->cap = 0;	

@@ -1,5 +1,7 @@
 //基于时间轮理论的定时器实现
 #include "timer.h"
+#include "../global.h"
+
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -38,23 +40,6 @@ struct timer_t {					//定时器
 	struct tobjqueue_t freelist;	//空闲的用户节点
 };
 
-static void DIE (const char * msg) {
-	fprintf(stderr, "%s\n", msg);
-	exit(1);
-}
-
-static void* REALLOC(void *p, size_t size) {
-	void * ptr = realloc(p, size);
-	if (!ptr) DIE("TIMER REALLOC FAIL\n");
-	return ptr;
-}
-
-static void* MALLOC(size_t size) {
-	void * ptr = malloc(size);
-	if (!ptr) DIE("TIMER MALLOC FAIL\n");
-	return ptr;
-}
-
 static void expand_objpool(struct timer_t * timer);
 static void add_obj_raw (struct timer_t * timer, struct tobj_t * tobj, uint32_t timeleft, uint32_t timeout, uint32_t repeat, void * ud, func_timer_callback cb);
 static void uq_addtail(struct tobjqueue_t * queue, struct tobj_t * tobj);
@@ -77,10 +62,10 @@ struct timer_t* timer_new(uint32_t tickn) {
 void timer_destroy(struct timer_t * timer) {
 	uint32_t i = 0;
 	for (; i < timer->objpooln; ++i)
-		free(timer->objpool[i]);
-	free(timer->objpool);
-	free(timer->ticklist);
-	free(timer);
+		FREE(timer->objpool[i]);
+	FREE(timer->objpool);
+	FREE(timer->ticklist);
+	FREE(timer);
 }
 
 uint32_t timer_add(struct timer_t * timer, uint32_t timeout, void * ud, func_timer_callback cb, uint32_t repeat) {
