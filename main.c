@@ -85,4 +85,4 @@ void * service_runable(void * ptr) {			//驱动 service 进行工作
 
 void signal_handler(int signal) {
 	_stop = 1;
-}//aaa
+}//aaa aaa
