@@ -8,7 +8,6 @@ enum SOSTATE {
 	SOS_CONNECTTING,
 	SOS_BAD,
 	SOS_FREE,
-	SOS_EV_WRITE,
 };
 
 struct sbuf_t {

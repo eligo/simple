@@ -282,7 +282,7 @@ void somgr_runonce(struct somgr_t* somgr, int wms) {
 		struct so_t* so = soqueue_pop(&somgr->writesos);
 		if (!so) break;
 		//printf("flush %d\n", so->id);
-		if (somgr_flush_so(somgr, so)) {
+		if (somgr_flush_so(somgr, so)) {		//发送
 			somgr_remove_so(somgr, so);
 		} else if (sbuf_cur(&so->wbuf) > 0) {	//还有数据没推出去说明该socket变成不可写了
 			so_clearstate(so, SOS_WRITABLE);	//设置成不可写
@@ -312,29 +312,29 @@ int somgr_write(struct somgr_t* somgr, int32_t id, char* data, uint32_t dlen) {
 	if (dlen == 0) return 0;
 	if (id < 1 || id >= somgr->sosn) return -1;
 	struct so_t* so = somgr->sos[id];
-	if (so_hasstate(so, SOS_BAD | SOS_LISTEN | SOS_FREE)) return -2;
+	if (so_hasstate(so, SOS_BAD | SOS_LISTEN | SOS_FREE | SOS_CONNECTTING)) return -2;
 	uint32_t fz = sbuf_freesz(&so->wbuf);
-	if (fz < dlen) {
-		if (so_hasstate(so, SOS_WRITABLE)) {
-			if (0 != somgr_flush_so(somgr, so))
+	if (fz < dlen) {								//本地缓存放不下
+		if (so_hasstate(so, SOS_WRITABLE) && sbuf_cur(&so->wbuf) > 0) {		//如果有机会发送一些
+			if (0 != somgr_flush_so(somgr, so))		//尝试发送一些，好挪出一点本地缓存
 				goto fail;
 			if (sbuf_cur(&so->wbuf) > 0) {			//说明变成不可写了
 				so_clearstate(so, SOS_WRITABLE);	//改成不可写状态
-				if (somgr_mod_so(somgr, so, 1))		//重置epoll事件(加入)
+				if (somgr_mod_so(somgr, so, 1))		//重置epoll事件(加入可写事件侦听)
 					goto fail;
 			}
+			fz = sbuf_freesz(&so->wbuf);
 		}
-		fz = sbuf_freesz(&so->wbuf);
-		if (fz < dlen) {
-			if (sbuf_expand(&so->wbuf, dlen - fz))
+		if (fz < dlen) {							//还是不够
+			if (sbuf_expand(&so->wbuf, dlen - fz))	//只好扩展本地缓存空间了
 				goto fail;
 		}
 	}
-	memcpy(sbuf_cptr(&so->wbuf), data, dlen);
-	sbuf_writed(&so->wbuf, dlen);
+	memcpy(sbuf_cptr(&so->wbuf), data, dlen);		//仅拷贝到本地缓存而不立刻发送(相当于累多点一次性发, 是为了优化调用write的次数)
+	sbuf_writed(&so->wbuf, dlen);					//维护本地缓存
 	if (so_hasstate(so, SOS_WRITABLE)) {			//当前为可写状态
 		if (!so->curq)								//如果不在待写队列
-			soqueue_push(&somgr->writesos, so); 	//加入待写队列
+			soqueue_push(&somgr->writesos, so); 	//加入待写队列, 待写队列会在下一帧再真正发送这些数据
 		else
 			assert(&somgr->writesos == so->curq);
 	} else {									
@@ -437,10 +437,6 @@ int somgr_mod_so(struct somgr_t* somgr, struct so_t* so, int w) {
 	ev.data.ptr = so;
 	if (epoll_ctl(somgr->ep, EPOLL_CTL_MOD, so->fd, &ev))
 		return -1;
-	if (w)
-		so_setstate(so, SOS_EV_WRITE);
-	else 
-		so_clearstate(so, SOS_EV_WRITE);
 	return 0;
 }
 
