@@ -141,13 +141,8 @@ int somgr_flush_so(struct somgr_t* somgr, struct so_t* so) {
 	int wn = 0;
 dowrite:
 	dn = sbuf_cur(&so->wbuf);
-	if (dn == 0) {
-		if (so_hasstate(so, SOS_WRITABLE) && so_hasstate(so, SOS_EV_WRITE)) {
-			if (somgr_mod_so(somgr, so, 0))	//没有数据可写 就取消写事件侦听, 否则会一直触发影响性能
-				goto fail;
-		}
+	if (dn == 0) 
 		return 0;
-	}
 	
 	wn = write(so->fd, so->wbuf.ptr, dn);	//调用系统api把数据写到系统缓冲区
 	if (wn > 0) {
@@ -157,9 +152,7 @@ dowrite:
 	} else if (wn < 0) {
 		switch (errno) {
 			case EAGAIN:	//写不进了, 对方接收过慢会产生这种情况(tcp滑动窗口机制)
-				so_clearstate(so, SOS_WRITABLE); //取消可写标志
-				if (somgr_mod_so(somgr, so, 1))	//侦听可写事件
-					goto fail;
+				printf("write EAGAIN %d\n", so->id);
 				return 0;
 			case EINTR:		//被系统中断打断, 可继续尝试
 				goto dowrite;
@@ -219,10 +212,19 @@ void somgr_proc_rw(struct somgr_t* somgr, struct so_t* so, unsigned ev) {	//处�
 		} else goto fail;
 	}
 
-	if (ev & EPOLLOUT) {	//可写
-		so_setstate(so, SOS_WRITABLE);	//设置状态 标记该socket可写
+	if (ev & EPOLLOUT) {						//该socket此刻可写
+		//printf("writable %d\n", so->id);
+		assert(!so_hasstate(so, SOS_WRITABLE));
+		assert(!so->curq);						//肯定不在待写队列
+		so_setstate(so, SOS_WRITABLE);			//设置标记该socket可写
 		if (0 != somgr_flush_so(somgr, so))		//可写的时候把还没有发送的内容刷到系统缓冲区
 			goto fail;
+		if (sbuf_cur(&so->wbuf) == 0) {			//数据全发出去了
+			if (somgr_mod_so(somgr, so, 0))		//重写设置感兴趣的事件(取消可写事件)
+				goto fail;
+		} else {								//依然有数据没推出, 说明状态又变成了不可写
+			so_clearstate(so, SOS_WRITABLE);	//设置成不可写, 保留事件侦听
+		}
 	}
 			
 	return;
@@ -279,15 +281,13 @@ void somgr_runonce(struct somgr_t* somgr, int wms) {
 	do {	//处理有数要发送且当前状态为可写的socket
 		struct so_t* so = soqueue_pop(&somgr->writesos);
 		if (!so) break;
+		//printf("flush %d\n", so->id);
 		if (somgr_flush_so(somgr, so)) {
 			somgr_remove_so(somgr, so);
-		} else {
-			if (sbuf_cur(&so->wbuf) > 0) {
-				assert(so_hasstate(so, SOS_WRITABLE) == 0);
-			} else {
-				if (somgr_mod_so(somgr, so, 0))
-					somgr_remove_so(somgr, so);
-			}
+		} else if (sbuf_cur(&so->wbuf) > 0) {	//还有数据没推出去说明该socket变成不可写了
+			so_clearstate(so, SOS_WRITABLE);	//设置成不可写
+			if (somgr_mod_so(somgr, so, 1))		//重写设置感兴趣的事件(加入可写事件)
+				somgr_remove_so(somgr, so);
 		}
 	} while (1);
 
@@ -318,6 +318,11 @@ int somgr_write(struct somgr_t* somgr, int32_t id, char* data, uint32_t dlen) {
 		if (so_hasstate(so, SOS_WRITABLE)) {
 			if (0 != somgr_flush_so(somgr, so))
 				goto fail;
+			if (sbuf_cur(&so->wbuf) > 0) {			//说明变成不可写了
+				so_clearstate(so, SOS_WRITABLE);	//改成不可写状态
+				if (somgr_mod_so(somgr, so, 1))		//重置epoll事件(加入)
+					goto fail;
+			}
 		}
 		fz = sbuf_freesz(&so->wbuf);
 		if (fz < dlen) {
@@ -327,17 +332,23 @@ int somgr_write(struct somgr_t* somgr, int32_t id, char* data, uint32_t dlen) {
 	}
 	memcpy(sbuf_cptr(&so->wbuf), data, dlen);
 	sbuf_writed(&so->wbuf, dlen);
-	if (so_hasstate(so, SOS_WRITABLE)) {		//当前为可写状态
-		if (!so->curq)							//如果不在待写队列,则加入
-			soqueue_push(&somgr->writesos, so);
-	} else if (!so_hasstate(so, SOS_EV_WRITE)) {	//如果当前不可写且没有侦听可写事件
-		if (so->curq)
+	if (so_hasstate(so, SOS_WRITABLE)) {			//当前为可写状态
+		if (!so->curq)								//如果不在待写队列
+			soqueue_push(&somgr->writesos, so); 	//加入待写队列
+		else
+			assert(&somgr->writesos == so->curq);
+	} else {									
+		if (so->curq) {								//有可能本来是可写的又在待写队列, 现在不可写了, 要拿出队列
+			assert(&somgr->writesos == so->curq);
 			soqueue_erase(so);
-		if (somgr_mod_so(somgr, so, 1))
-			goto fail;
-	} 
+		}
+	}
 	return 0;
 fail:
+	if (so->curq) {
+		assert(&somgr->writesos == so->curq);
+		soqueue_erase(so);
+	}
 	somgr_remove_so(somgr, so);
 	return -1;
 }

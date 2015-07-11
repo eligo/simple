@@ -16,10 +16,10 @@ end
 function c_onTcpConnected(sid, ud)
 	print("c_onTcpConnected", sid, ud)
 	for i = 1, 1 do
-		g_timer:timeout(1, -1, 
+		g_timer:timeout(10, -1, 
 								function(...)
 									--c_interface.c_send(sid, string.format("hello world aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa %s\r\n", os.time()))
-									for i = 1, 10 do
+									for i = 1, 1000 do
 									
 										c_interface.c_send(sid, string.format("helloworldhelloworld %s\r\n",i))--os.time()))
 									end
@@ -34,7 +34,7 @@ end
 local i = 0
 function c_onTcpData(sid, str)	--框架事件通知
 	i = i + 1
-	if i%10000 == 0 then
+	if i%1000 == 0 then
 		print("recv", str, i)
 	end
 	--for i = 1, 10 do
@@ -85,8 +85,8 @@ function(...)
 end,
 1
 )]]
-for k = 1, 100 do
+--for k = 1, 100 do
 	c_interface.c_connect(111, "0.0.0.0", 9999)
-end
+--end
 ---------------------------------------------------------other require---------------------------------------------------------
 require ("scripts.handle.test_handle")		--协议处理
