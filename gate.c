@@ -44,7 +44,7 @@ void gate_delete(struct gate_t * gate) {
 }
 
 void gate_runonce (struct gate_t * gate) {
-	uint64_t stm = time_currentms();
+	uint64_t stm = time_ms();
 	uint64_t ctm = 0;
 	uint32_t count = 0;
 	int sleepms = 50;
@@ -78,7 +78,7 @@ void gate_runonce (struct gate_t * gate) {
 		}
 		FREE (packet);
 		if (++count%1000 == 0) {
-			ctm = time_currentms();
+			ctm = time_ms();
 			if (ctm - stm >= 50) {
 				sleepms = 0;
 				break;

@@ -15,14 +15,16 @@ end
 
 function c_onTcpConnected(sid, ud)
 	print("c_onTcpConnected", sid, ud)
-	
-	g_timer:timeout(1, -1, 
+	for i = 1, 1 do
+		g_timer:timeout(1, -1, 
 								function(...)
 									--c_interface.c_send(sid, string.format("hello world aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa %s\r\n", os.time()))
-									for i = 1, 10000 do
-										c_interface.c_send(sid, string.format("helloworldhelloworld %s\r\n",os.time()))
+									for i = 1, 10 do
+									
+										c_interface.c_send(sid, string.format("helloworldhelloworld %s\r\n",i))--os.time()))
 									end
 								end)
+	end
 	--c_interface.c_close(sid)
 end
 
@@ -83,6 +85,8 @@ function(...)
 end,
 1
 )]]
-c_interface.c_connect(111, "0.0.0.0", 9999)
+for k = 1, 100 do
+	c_interface.c_connect(111, "0.0.0.0", 9999)
+end
 ---------------------------------------------------------other require---------------------------------------------------------
 require ("scripts.handle.test_handle")		--协议处理

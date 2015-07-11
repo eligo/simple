@@ -40,7 +40,7 @@ struct service_t * service_new(struct gsq_t * g2s_queue, struct gsq_t * s2g_queu
 		service->s2g_queue = s2g_queue;
 		service->timer = timer_new(10*60*5);	//1/10秒精度的定时器, 缓存为5分钟(当然超出30分钟也是可以的)
 		service->lparser = lua_open();
-		service->tick = time_currentms()/100;
+		service->tick = time_real_ms()/100;
 		luaL_openlibs(service->lparser);
 		lua_pushstring(service->lparser, "service_ptr");
 		lua_pushlightuserdata (service->lparser, (void *)service);
@@ -86,7 +86,7 @@ void service_tick(struct service_t* service, uint64_t ctick) {
 
 void service_runonce(struct service_t * service) {
 	uint32_t count = 0;
-	service_tick(service, time_currentms()/100);	//处理定时器
+	service_tick(service, time_ms()/100);	//处理定时器
 	while (1) {	//处理业务
 		int type = 0;
 		void * packet = gsq_pop(service->g2s_queue, &type);
@@ -119,10 +119,10 @@ void service_runonce(struct service_t * service) {
 		}
 		FREE (packet);
 		if (++count%100 == 0)	//100是经验值可换成别的, 每处理100个业务包就处理一下定时器
-			service_tick(service, time_currentms()/100);	//处理定时器	
+			service_tick(service, time_ms()/100);	//处理定时器	
 	}
 
-	if (count) service_tick(service, time_currentms()/100);
+	if (count) service_tick(service, time_ms()/100);
 }
 
 static int lua_error_cb (lua_State* L);

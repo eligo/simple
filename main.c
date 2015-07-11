@@ -34,6 +34,8 @@ int main (int nargs, char** args) {
 	int port = 9999;
 	if (nargs > 1)
 		port = atoi(args[1]);
+
+	time_global_reset();
 	struct gate_t * gate = gate_new(port, g2s_queue, s2g_queue);//创建 gate 模块, 负责用户接入
 	if (!gate) {
 		fprintf(stderr, "gate fail\n");
@@ -52,7 +54,8 @@ int main (int nargs, char** args) {
 	pthread_create(&gate_thread, NULL, gate_runable, gate);				//创建一个线程服务于 gate 模块
 	pthread_create(&service_thread, NULL, service_runable, service);	//创建一个线程用于 service 模块
 	do {
-		sleep(1);
+		usleep(1000);
+		time_global_reset();
 						//TODO 定时监控一下 gate service 运行是否健康
 	} while(!_stop);	//收到关闭信号会让_stop变成1
 

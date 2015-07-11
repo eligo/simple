@@ -1,3 +1,4 @@
+//原语锁
 #include "lock.h"
 #include <stdlib.h>
 #include "global.h"

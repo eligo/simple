@@ -9,6 +9,9 @@
 #include <stdio.h>
 #include <sys/time.h>
 
+static uint64_t g_currentMs = 0;
+static uint32_t g_unixtime = 0;
+
 struct tobjqueue_t ;
 struct tobj_t {						//用户节点(需定时的对象)
 	uint32_t id;					//tid
@@ -239,8 +242,21 @@ void expand_objpool(struct timer_t * timer) {	//扩展用户节点数量
 	timer->objpooln = pooln;
 }
 
-uint64_t time_currentms() {
+uint64_t time_real_ms() {
 	struct timeval tv;
 	gettimeofday(&tv, NULL);
 	return tv.tv_sec * 1000 + tv.tv_usec / 1000;
+}
+
+void time_global_reset() {
+	g_currentMs = time_real_ms();
+	g_unixtime = g_currentMs/1000;
+}
+
+uint64_t time_ms() {
+	return g_currentMs;
+}
+
+uint32_t time_unixtime() {
+	return g_unixtime;
 }

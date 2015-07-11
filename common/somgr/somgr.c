@@ -143,27 +143,27 @@ dowrite:
 	dn = sbuf_cur(&so->wbuf);
 	if (dn == 0) {
 		if (so_hasstate(so, SOS_WRITABLE) && so_hasstate(so, SOS_EV_WRITE)) {
-			if (somgr_mod_so(somgr, so, 0))
+			if (somgr_mod_so(somgr, so, 0))	//没有数据可写 就取消写事件侦听, 否则会一直触发影响性能
 				goto fail;
 		}
 		return 0;
 	}
 	
-	wn = write(so->fd, so->wbuf.ptr, dn);
+	wn = write(so->fd, so->wbuf.ptr, dn);	//调用系统api把数据写到系统缓冲区
 	if (wn > 0) {
 		assert(dn >= wn);
 		sbuf_readed(&so->wbuf, wn);
 		goto dowrite;
 	} else if (wn < 0) {
 		switch (errno) {
-			case EAGAIN:
-				so_clearstate(so, SOS_WRITABLE);
-				if (somgr_mod_so(somgr, so, 1))
+			case EAGAIN:	//写不进了, 对方接收过慢会产生这种情况(tcp滑动窗口机制)
+				so_clearstate(so, SOS_WRITABLE); //取消可写标志
+				if (somgr_mod_so(somgr, so, 1))	//侦听可写事件
 					goto fail;
 				return 0;
-			case EINTR:
+			case EINTR:		//被系统中断打断, 可继续尝试
 				goto dowrite;
-			default:
+			default:		//肯定有错误发生了
 				goto fail;
 		}
 	} else goto fail;

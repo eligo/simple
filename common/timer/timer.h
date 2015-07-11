@@ -12,7 +12,9 @@ int timer_del(struct timer_t * timer, uint32_t tid);	//删除一个定时
 void timer_tick(struct timer_t * timer);	//触发一个时刻的定时
 uint32_t timer_nearest(struct timer_t * timer);	//找到最近需要定时的时刻
 
-uint64_t time_currentms(); //当前时间戳 毫秒
-
-void tiemr_test();	//测试用
+uint64_t time_real_ms(); 	//当前时间戳 毫秒 实时
+uint64_t time_ms();			//非实时
+uint32_t time_unixtime();	//非实时
+void time_global_reset();	//设置非实时时间值
+//void tiemr_test();	//测试用
 #endif
