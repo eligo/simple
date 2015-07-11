@@ -328,10 +328,10 @@ int somgr_write(struct somgr_t* somgr, int32_t id, char* data, uint32_t dlen) {
 	}
 	memcpy(sbuf_cptr(&so->wbuf), data, dlen);
 	sbuf_writed(&so->wbuf, dlen);
-	if (so_hasstate(so, SOS_WRITABLE)) {
-		if (!so->curq)
+	if (so_hasstate(so, SOS_WRITABLE)) {		//当前为可写状态
+		if (!so->curq)							//如果不在待写队列,则加入
 			soqueue_push(&somgr->writesos, so);
-	} else if (!so_hasstate(so, SOS_EV_WRITE)) {
+	} else if (!so_hasstate(so, SOS_EV_WRITE)) {	//如果当前不可写且没有侦听可写事件
 		if (so->curq)
 			soqueue_erase(so);
 		if (somgr_mod_so(somgr, so, 1))

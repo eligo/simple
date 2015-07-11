@@ -13,7 +13,7 @@ static void * service_runable(void * ptr);	//
 static void signal_handler(int signal); 	//进程信号回调
 static int _stop = 0;	//是否结束标志
 
-int main() {
+int main (int nargs, char** args) {
 	sigset_t old_mask;
 	sigset_t new_mask;
 	signal(SIGPIPE,SIG_IGN);	//忽略该信号
@@ -31,10 +31,16 @@ int main() {
 	pthread_t service_thread;
 	struct gsq_t * g2s_queue = gsq_new();						//消息队列
 	struct gsq_t * s2g_queue = gsq_new();						//消息队列
-	struct gate_t * gate = gate_new(9999, g2s_queue, s2g_queue);//创建 gate 模块, 负责用户接入
+	int port = 9999;
+	if (nargs > 1)
+		port = atoi(args[1]);
+	struct gate_t * gate = gate_new(port, g2s_queue, s2g_queue);//创建 gate 模块, 负责用户接入
 	if (!gate) {
 		fprintf(stderr, "gate fail\n");
 		return -1;
+	} else {
+		if (port)
+			fprintf(stderr, "server listen on port:%d\n", port);
 	}
 
 	struct service_t * service = service_new(g2s_queue, s2g_queue);		//service 模块, 负责业务处理, gate 把客户端消息通过消息队列 g2s_qeueue 传递给 service 模块处理

@@ -23,7 +23,7 @@ static void notify_so_error(struct gate_t* gate, int id, int ud);
 struct gate_t * gate_new(int port, struct gsq_t * g2s_queue, struct gsq_t * s2g_queue) {
 	struct gate_t* gate = (struct gate_t *) MALLOC (sizeof(*gate));
 	struct somgr_t* somgr = somgr_new(gate, tcp_accepted, tcp_readed, tcp_errored, tcp_connected);
-	if (0 >= somgr_listen(somgr, "0.0.0.0", port)) {	//端口侦听失败
+	if (port && 0 >= somgr_listen(somgr, "0.0.0.0", port)) {	//端口侦听失败
 		fprintf(stderr, "listen fail\n");
 		somgr_destroy(somgr);
 		FREE (gate);
@@ -55,8 +55,7 @@ void gate_runonce (struct gate_t * gate) {
 		switch (type) {
 			case S2G_TCP_DATA: {
 				struct s2g_tcp_data_t* ev = (struct s2g_tcp_data_t*)packet;
-				int err = somgr_write(gate->somgr, ev->sid, ev->data, ev->dlen);
-				assert(err == 0);
+				somgr_write(gate->somgr, ev->sid, ev->data, ev->dlen);
 				FREE(ev->data);
 				break;
 			}

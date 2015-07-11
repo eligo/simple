@@ -23,6 +23,7 @@ function c_onTcpConnected(sid, ud)
 										c_interface.c_send(sid, string.format("helloworldhelloworld %s\r\n",os.time()))
 									end
 								end)
+	--c_interface.c_close(sid)
 end
 
 function c_onTcpClosed(sid, ud)		--框架事件通知
@@ -34,7 +35,9 @@ function c_onTcpData(sid, str)	--框架事件通知
 	if i%10000 == 0 then
 		print("recv", str, i)
 	end
-	--c_interface.c_send(sid, string.format("hello world aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa %s\r\n", os.time()))
+	--for i = 1, 10 do
+	--	c_interface.c_send(sid, str.."\r\n")
+	--end--c_interface.c_send(sid, string.format("hello world aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa %s\r\n", os.time()))
 	--print("recv", str)
 	--[[responser._sid = sid
 	local ok, package = pcall(json.decode, str)
