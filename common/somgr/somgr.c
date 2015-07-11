@@ -188,18 +188,17 @@ fail:
 	somgr_remove_so(somgr, so);
 }
 
-
-void somgr_proc_rw(struct somgr_t* somgr, struct so_t* so, unsigned ev) {
+void somgr_proc_rw(struct somgr_t* somgr, struct so_t* so, unsigned ev) {	//处理读写事件
 	int rn = 0, pn = 0;
 	uint32_t fz = 0;
-	if (ev & EPOLLIN) {
+	if (ev & EPOLLIN) {		//可读
 		fz = sbuf_freesz(&so->rbuf);
 		if (fz == 0) {
-			if (sbuf_expand(&so->rbuf, so->rbuf.cap == 0? 1024 : so->rbuf.cap))
+			if (sbuf_expand(&so->rbuf, so->rbuf.cap == 0? 1024 : so->rbuf.cap))	//扩展接收缓冲区
 				goto fail;
 			fz = sbuf_freesz(&so->rbuf);
 		}
-		rn = read(so->fd, sbuf_cptr(&so->rbuf), fz);
+		rn = read(so->fd, sbuf_cptr(&so->rbuf), fz);	//操作系统读取调用
 		if (rn > 0) {
 			assert(rn <= fz);
 			sbuf_writed(&so->rbuf, rn);
@@ -207,12 +206,12 @@ void somgr_proc_rw(struct somgr_t* somgr, struct so_t* so, unsigned ev) {
 			if (pn < 0 || pn > so->rbuf.cur)  
 				goto fail;
 			sbuf_readed(&so->rbuf, pn);
-			if (so_hasstate(so, SOS_BAD)) 
+			if (so_hasstate(so, SOS_BAD)) //因为rcb可能会把该socket kick 掉， 所以检查一下是有必要的
 				goto fail;
 		} else if (rn < 0) {
 			switch (errno) {
-				case EAGAIN:
-				case EINTR:
+				case EAGAIN:	//没有内容可读
+				case EINTR:		//读的过程中被系统中断, 可以下次再重试操作
 					return;
 				default:
 					goto fail;
@@ -220,9 +219,9 @@ void somgr_proc_rw(struct somgr_t* somgr, struct so_t* so, unsigned ev) {
 		} else goto fail;
 	}
 
-	if (ev & EPOLLOUT) {
-		so_setstate(so, SOS_WRITABLE);
-		if (0 != somgr_flush_so(somgr, so))
+	if (ev & EPOLLOUT) {	//可写
+		so_setstate(so, SOS_WRITABLE);	//设置状态 标记该socket可写
+		if (0 != somgr_flush_so(somgr, so))		//可写的时候把还没有发送的内容刷到系统缓冲区
 			goto fail;
 	}
 			
@@ -247,14 +246,14 @@ void somgr_proc_accept(struct somgr_t* somgr, struct so_t* lso) {
 		}
 	} else if (fd == 0)
 		goto e_fderr2;
-	so = somgr_alloc_so(somgr);
+	so = somgr_alloc_so(somgr);		//尝试分配一个上下文来存放socket信息
 	if (!so) goto e_nullso;
 	so->fd = fd;
-	if (somgr_add_so(somgr, so)) {
+	if (somgr_add_so(somgr, so)) {	//把socket加入epoll
 		somgr_free_so(somgr, so);
 		goto e_adderr;
 	}
-	somgr->acb(somgr->ud, lso->id, so->id);
+	somgr->acb(somgr->ud, lso->id, so->id);	//回调上层
 	return;
 e_nullso:
 	close(fd);
@@ -269,7 +268,7 @@ void somgr_runonce(struct somgr_t* somgr, int wms) {
 	struct epoll_event evs[1024];
 	int en = 0;
 	int i = 0;
-	do {
+	do {	//处理坏掉的socket
 		struct so_t* so = soqueue_pop(&somgr->badsos);
 		if (!so) break;
 		uint32_t soid = so->id;
@@ -277,7 +276,7 @@ void somgr_runonce(struct somgr_t* somgr, int wms) {
 		somgr_free_so(somgr, so);
 	} while(1);
 
-	do {
+	do {	//处理有数要发送且当前状态为可写的socket
 		struct so_t* so = soqueue_pop(&somgr->writesos);
 		if (!so) break;
 		if (somgr_flush_so(somgr, so)) {
@@ -292,7 +291,7 @@ void somgr_runonce(struct somgr_t* somgr, int wms) {
 		}
 	} while (1);
 
-	en = epoll_wait(somgr->ep, evs, 1024, wms);
+	en = epoll_wait(somgr->ep, evs, 1024, wms);	//查询epoll里面所有socket事件(未必是全部,epoll内部会有排队机制,一次拿不完,多次肯定可以拿完)
 	for (; i < en; i++) {
 		struct so_t* so = evs[i].data.ptr;
 		if (evs[i].events & (EPOLLHUP | EPOLLERR)) {
