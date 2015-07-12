@@ -79,7 +79,7 @@ void* service_runable(void * ptr) {			//驱动 service 进行工作
 	struct service_t * service = (struct service_t *) ptr;
 	do {
 		service_runonce(service);
-		usleep(1000*50);	//service 时间精度为 1/10 秒, 这里也睡眠1/10秒
+		usleep(1000*50);
 	} 
 	while (!_stop);
 
