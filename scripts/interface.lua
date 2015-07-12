@@ -1,13 +1,13 @@
---这个文件主要实现供底层驱动上层的函数(c_onxxxx这种)
+--这个文件主要实现供底层驱动上层的函数(c_onXxxx这种)
 package.cpath = string.format("%s;%s?.so", package.cpath, './3rd/luaso/')	--设置外部c库的搜索路径
-require ("luautil.timer")	
-
-local json = require ('cjson')	--json 工具(encode decode)
-local responser = {_sid=nil}	--简单封装一些操作
-
-g_timer:init()					--定时器管理器
-g_msgHandlers = {}				--协议处理
-
+local class = require("luautil.class")	--类管理器
+require("luautil.timer")	
+local timer = class.singleton("timer")	--定时器
+local json = require ('cjson')			--json 工具(encode decode)
+local responser = {_sid=nil}			--简单封装一些操作
+local handlers = class.singleton("protocol_handlers")	--协议处理集合
+require("scripts.handle.test_handle")					--协议处理实现
+require("luautil.mysql")
 ---------------------------------------------------------framework event---------------------------------------------------------
 function c_onTcpAccepted(sid)				--框架事件(连接接受)
 	print("c_onTcpAccepted", sid)
@@ -34,7 +34,7 @@ function c_onTcpData(sid, str)				--框架事件(连接业务数据到达)
 		return
 	end
 
-	local handler = g_msgHandlers[package.op]
+	local handler = handlers[package.op]
 	if handler then
 		handler(package, responser)
 	else
@@ -42,8 +42,8 @@ function c_onTcpData(sid, str)				--框架事件(连接业务数据到达)
 	end
 end
 
-function c_onTimer(tid, erased)				--框架事件(某定时器到期触发)
-	g_timer:onTimer(tid, erased)
+function c_onTimer(tid, erased)				--框架事件(某定时器到期触发) 定时器使用如 timer:timeout(1, 100, function() print("hello") end) 每1个滴答调用一下func, 重复100下
+	timer:onTimer(tid, erased)
 end
 
 ---------------------------------------------------------other---------------------------------------------------------
@@ -64,5 +64,4 @@ function responser:sockid()
 	return self._sid
 end
 --c_interface.c_connect(111, "0.0.0.0", 9999)
----------------------------------------------------------other require---------------------------------------------------------
-require ("scripts.handle.test_handle")		--协议处理
+

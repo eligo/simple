@@ -1,19 +1,19 @@
 --全局定时器
+local class = require("luautil.class")
+local timer = class.singleton("timer")	--单例
 
-g_timer = g_timer or {}
-
-function g_timer:init()
+function timer:__init()
 	self._cbs = {}
 end
 
-function g_timer:timeout(ticks, repeatn, func, ...)
+function timer:timeout(ticks, repeatn, func, ...)
 	assert(type(func) == 'function')
 	local tid = c_interface.c_timeout(ticks, repeatn, repeatn or 1)
 	self._cbs[tid] = {func, ...}
 	return tid
 end
 
-function g_timer:onTimer(tid, erased)
+function timer:onTimer(tid, erased)
 	local cb = self._cbs[tid]
 	if cb then
 		if erased ~= 0 then
@@ -25,6 +25,6 @@ function g_timer:onTimer(tid, erased)
 	end
 end
 
-function g_timer:erase(tid)
+--function timer:erase(tid)
 	--todo
-end
+--end
