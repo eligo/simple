@@ -20,9 +20,9 @@ handlers["login"] = function (package, responser)
 				responser:closeconnect()
 			else
 				if package.md5 == md5(package.account..keys[account]..rows[1].passwd) then	--登陆不要传送密码明文, 科学的做法是传送(username + 随机串(登录前向服务器获取) + 密码) 做md5运算之后的串
-					responser:write("login success")
+					responser:write("login success!")
 				else
-					responser:write("passwd error!")
+					responser:write("login fail!")
 					responser:closeconnect()
 				end
 			end

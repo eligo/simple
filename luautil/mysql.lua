@@ -18,23 +18,12 @@ function mysql:select(tbl, field, conditon)
 	if not self._conn then return end
 	assert(type(tbl) == 'string')
 	assert(type(field) == 'string')
-	assert(type(conditon) == 'table' or not conditon)
+	assert(type(conditon) == 'string' or not conditon)
 	local sql = "SELECT "..field.." FROM "..tbl
 	if conditon then
-		local con = ""
-		local first = true
-		for k, v in pairs(conditon) do
-			assert(type(k) ~= 'table')
-			assert(type(v) ~= 'table')
-			if not first then 
-				con = con.." AND "
-			end
-			first = false
-			con = con..k.."='"..v.."'"
-		end
-		sql = sql.." WHERE "..con
+		sql = sql.." WHERE "..conditon
 	end
-	local cur, err = con:execute(sql)
+	local cur, err = self._conn:execute(sql)
 	if cur then
 		local rows = {}
 		while cur do
@@ -78,7 +67,7 @@ function mysql:update(tbl, data, conditon)
 	if not self._conn then return end
 	assert(type(tbl) == 'string')
 	assert(type(data) == 'table')
-	assert(type(conditon) == 'table')
+	assert(type(conditon) == 'string' or not conditon)
 	local sql = "UPDATE "..tbl..' set '
 	local upd = ""
 	local first = true
@@ -89,16 +78,10 @@ function mysql:update(tbl, data, conditon)
 		assert(type(v) ~= 'table')
 		upd = upd..k.."='"..v.."'"
 	end
-	first = true
-	local con = ""
-	for k, v in pairs(conditon) do
-		assert(type(k) ~= 'table')
-		assert(type(v) ~= 'table')
-		if not first then con = con.." AND " end
-		first = false
-		con = con..k.."='"..v.."'"
+	sql = sql..upd
+	if conditon then
+		sql = sql..upd.." WHERE "..conditon
 	end
-	sql = sql..upd.." WHERE "..con
 	local effectRows, err = self._conn:execute(sql)
 	return err, effectRows
 end
