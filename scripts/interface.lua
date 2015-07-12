@@ -60,6 +60,9 @@ function responser:closeconnect ()
 	c_interface.c_close(self._sid)
 end
 
+function responser:sockid()
+	return self._sid
+end
 --c_interface.c_connect(111, "0.0.0.0", 9999)
 ---------------------------------------------------------other require---------------------------------------------------------
 require ("scripts.handle.test_handle")		--协议处理
