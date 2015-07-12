@@ -21,7 +21,7 @@ struct somgr_t {
 	int ep;
 	struct so_t** sos;
 	uint32_t sosn;
-	struct soqueue_t freesos;	//没用上的
+	struct soqueue_t freesos;	//备用的socket结构
 	struct soqueue_t badsos;	//待关闭的socket
 	struct soqueue_t writesos;	//待写的socket
 	void* ud;
