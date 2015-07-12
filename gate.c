@@ -48,7 +48,7 @@ void gate_runonce (struct gate_t * gate) {
 	uint64_t ctm = 0;
 	uint32_t count = 0;
 	int sleepms = 50;
-	do {
+	do {					//处理service递交过来的请求
 		int type = 0;
 		void * packet = gsq_pop(gate->s2g_queue, &type);
 		if (!packet) break;
@@ -85,7 +85,7 @@ void gate_runonce (struct gate_t * gate) {
 			}
 		}
 	} while(1);
-	somgr_runonce(gate->somgr, sleepms);
+	somgr_runonce(gate->somgr, sleepms);	//处理网络读写
 }
 
 int tcp_accepted(void *ud, int lid, int nid) {	//tcp 建立时回调
