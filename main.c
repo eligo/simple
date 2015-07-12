@@ -14,18 +14,14 @@ static void signal_handler(int signal); 	//进程信号回调
 static int _stop = 0;	//是否结束标志
 
 int main (int nargs, char** args) {
-	sigset_t old_mask;
-	sigset_t new_mask;
-	signal(SIGPIPE,SIG_IGN);	//忽略该信号
-	sigfillset(&new_mask);
-	sigdelset(&new_mask, 2);
-	sigdelset(&new_mask, 15);
-	sigdelset(&new_mask, SIGSEGV);
-	pthread_sigmask(SIG_BLOCK, &new_mask, &old_mask);
-	signal(2, signal_handler);//设置进程信号处理
-	signal(15, signal_handler);//设置进程信号处理
-	signal(SIGTERM, signal_handler);//设置进程信号处理
-	signal(SIGSEGV, signal_handler);//设置进程信号处理
+	struct sigaction sa1;
+	sa1.sa_handler = SIG_IGN;
+	sigaction(SIGPIPE, &sa1, 0);		//屏蔽SIGPIPE信号
+
+	struct sigaction sa2;
+	sa2.sa_handler = signal_handler;
+	sigaction(SIGINT, &sa2, 0);			//添加SIGINT(ctrl + c) SIGTERM (kill pid) 信号处理
+	sigaction(SIGTERM, &sa2, 0);
 
 	pthread_t gate_thread;
 	pthread_t service_thread;
@@ -91,5 +87,6 @@ void* service_runable(void * ptr) {			//驱动 service 进行工作
 }
 
 void signal_handler(int signal) {
+printf("aaaaaa\n");
 	_stop = 1;
 }
