@@ -1,6 +1,6 @@
 --这个文件主要实现供底层驱动上层的函数(c_onxxxx这种)
 package.cpath = string.format("%s;%s?.so", package.cpath, './3rd/luaso/')	--设置外部c库的搜索路径
-require ("scripts.util.timer")	
+require ("luautil.timer")	
 
 local json = require ('cjson')	--json 工具(encode decode)
 local responser = {_sid=nil}	--简单封装一些操作
