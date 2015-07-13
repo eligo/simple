@@ -37,7 +37,7 @@ function mysql:select(tbl, field, conditon)
 	return err, nil
 end
 
-function mysql:insert(tbl, row)			--TODO
+function mysql:insert(tbl, row)			--TODO 拼字符串这种事,放c做比较好
 	if not self._conn then return end
 	assert(type(tbl) == 'string')
 	assert(type(row) == 'table')

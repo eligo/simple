@@ -28,7 +28,8 @@ local lasttime = 0
 function c_onTcpData(sid, str)				--框架事件(连接业务数据到达)
 	--print(str)
 	if str == 'quit' then
-		c_interface.c_close(sid)
+		c_interface.c_send(sid, "goodbye!!!\r\n")
+		c_interface.c_close(sid)	
 	end
 	c_interface.c_send(sid, string.format("welcome! current time: %s, enter 'quit' will close connection\r\n", c_interface.c_unixtime_ms()))
 	i=i+1
