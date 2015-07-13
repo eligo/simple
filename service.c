@@ -27,11 +27,11 @@ static int c_unixtime_ms(struct lua_State* lparser);
 static void time_cb (void * ud, uint32_t tid, int erased);
 
 struct service_t {
-	struct gsq_t * g2s_queue;
-	struct gsq_t * s2g_queue;
-	struct timer_t * timer;
+	struct gsq_t* g2s_queue;
+	struct gsq_t* s2g_queue;
+	struct timer_t* timer;
 	uint64_t tick;
-	struct lua_State * lparser;	//lua 脚本解释器
+	struct lua_State* lparser;	//lua 脚本解释器
 	int qflag;
 };
 
@@ -69,8 +69,8 @@ struct service_t * service_new(struct gsq_t * g2s_queue, struct gsq_t * s2g_queu
 
 void service_delete(struct service_t * service) {
 	if (service) {
-		if (service->lparser)
-			lua_close(service->lparser);
+		if (service->lparser) lua_close(service->lparser);
+		if (service->timer) timer_destroy(service->timer);
 		FREE(service);
 	}
 }
@@ -270,6 +270,7 @@ int c_unixtime_ms(struct lua_State* lparser) {
 	lua_pushnumber(lparser, ms);
 	return 1;
 }
+
 int lua_error_cb(lua_State *L) {
     lua_getfield(L, LUA_GLOBALSINDEX, "debug");
     lua_getfield(L, -1, "traceback");

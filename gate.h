@@ -1,3 +1,4 @@
+//网络收发模块
 #ifndef __GATE_HEADER__
 #define __GATE_HEADER__
 

@@ -83,8 +83,9 @@ void somgr_destroy(struct somgr_t* somgr) {
 	for ( ; i<somgr->sosn; ++i) {
 		struct so_t* so = somgr->sos[i];
 		if (so) {
-			if (so->fd)
-				close(so->fd);
+			if (so->fd)	close(so->fd);
+			sbuf_reset(&so->rbuf);
+			sbuf_reset(&so->wbuf);
 			FREE(so);
 		}
 	}
@@ -499,15 +500,15 @@ int so_setnoblock(struct so_t* so) {	//设置socket描述符为非阻塞(read, w
 }
 
 void so_setstate(struct so_t* so, int sta) {		//添加sta这个状态
-	so->state |= 1<<sta;
+	so->state |= sta;
 }
 
 uint32_t so_hasstate(struct so_t* so, int sta) {	//是否具备sta这个状态
-	return so->state & 1<<sta;
+	return so->state & sta;
 }
 
 void so_clearstate(struct so_t* so, int sta) {		//清除sta这个状态
-	so->state &= ~(1<<sta);
+	so->state &= ~(sta);
 }
 
 void somgr_wait_g(struct somgr_t* somgr, int ms) {	//service模块调来sleep, gate模块可以随时调用somgr_notify_s来唤醒它

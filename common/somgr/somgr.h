@@ -1,3 +1,4 @@
+//连接管理
 #ifndef __SOMGR_HEADER__
 #define __SOMGR_HEADER__
 #include <stdint.h>

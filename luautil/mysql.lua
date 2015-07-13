@@ -37,7 +37,7 @@ function mysql:select(tbl, field, conditon)
 	return err, nil
 end
 
-function mysql:insert(tbl, row)
+function mysql:insert(tbl, row)			--TODO
 	if not self._conn then return end
 	assert(type(tbl) == 'string')
 	assert(type(row) == 'table')

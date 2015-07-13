@@ -3,11 +3,11 @@
 #include <stdint.h>
 
 enum SOSTATE {
-	SOS_LISTEN = 1,
-	SOS_WRITABLE,
-	SOS_CONNECTTING,
-	SOS_BAD,
-	SOS_FREE,
+	SOS_LISTEN = 1 << 0,
+	SOS_WRITABLE = 1 << 1,
+	SOS_CONNECTTING = 1 << 2,
+	SOS_BAD = 1 << 3,
+	SOS_FREE = 1 << 4,
 };
 
 struct sbuf_t {

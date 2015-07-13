@@ -1,6 +1,6 @@
+/*连接gate与service纽带*/
 #ifndef __GSQ_HEADER__
 #define __GSQ_HEADER__
-
 enum GS_EV {
 	G2S_TCP_ACCEPTED,
 	G2S_TCP_CLOSED,
@@ -57,7 +57,7 @@ int gsq_push(struct gsq_t * q, int type, void * ev);	//线程安全(内部已上
 void * gsq_pop(struct gsq_t * q, int * type);			//线程安全(内部已上锁)
 
 void gsq_set_gs(struct gsq_t * gsq, struct gate_t* gate, struct service_t* service);
-void gsq_wait_g(struct gsq_t * gsq, int ms);
-void gsq_notify_s(struct gsq_t * gsq);
-void gsq_notify_g(struct gsq_t * gsq);
+void gsq_wait_g(struct gsq_t * gsq, int ms);			//service模块调来于等待gate事件, gate模块可以随时调用somgr_notify_s来唤醒它
+void gsq_notify_s(struct gsq_t * gsq);					//唤醒service
+void gsq_notify_g(struct gsq_t * gsq);					//唤醒gate
 #endif

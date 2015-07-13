@@ -1,6 +1,6 @@
 --这里放客户端过来的协议处理
 local class = require("luautil.class")
-local mysql = class.template("mysql")
+--local mysql = class.template("mysql")
 local handlers = class.singleton("protocol_handlers")	--协议处理
 
 local keys = {}
