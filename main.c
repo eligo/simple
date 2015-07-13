@@ -46,7 +46,8 @@ int main (int nargs, char** args) {
 		fprintf(stderr, "service fail\n");
 		return -2;
 	}
-
+	gsq_set_gs(g2s_queue, gate, service);
+	gsq_set_gs(s2g_queue, gate, service);
 	pthread_create(&gate_thread, NULL, gate_runable, gate);				//创建一个线程服务于 gate 模块
 	pthread_create(&service_thread, NULL, service_runable, service);	//创建一个线程用于 service 模块
 	do {
@@ -79,7 +80,6 @@ void* service_runable(void * ptr) {			//驱动 service 进行工作
 	struct service_t * service = (struct service_t *) ptr;
 	do {
 		service_runonce(service);
-		usleep(1000*50);
 	} 
 	while (!_stop);
 

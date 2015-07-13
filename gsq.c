@@ -23,6 +23,8 @@ struct gsq_t {
 	struct queue_t q0;
 	struct queue_t q1;
 	int current;
+	struct gate_t* gate;
+	struct service_t* service;
 };
 
 static int queue_push(struct queue_t * queue, int type, void * ev) {
@@ -119,4 +121,24 @@ void * gsq_pop(struct gsq_t * q, int * type) {
 	}
 	lock_unlock(q->lock_o);
 	return ev;
+}
+
+#include "gate.h"
+#include "service.h"
+#include "common/somgr/somgr.h"
+void gsq_set_gs(struct gsq_t * gsq, struct gate_t* gate, struct service_t* service) {
+	gsq->gate = gate;
+	gsq->service = service;
+}
+
+void gsq_notify_g(struct gsq_t * gsq) {
+	gate_notify_g(gsq->gate);
+}
+
+void gsq_notify_s(struct gsq_t * gsq) {
+	gate_notify_s(gsq->gate);
+}
+
+void gsq_wait_g(struct gsq_t * gsq, int ms) {
+	gate_wait_g(gsq->gate, ms);
 }

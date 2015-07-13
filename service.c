@@ -12,17 +12,18 @@
 #include "lualib.h"
 #include "lauxlib.h"
 
-static void l_on_tcp_accepted(struct service_t * service, struct g2s_tcp_accepted_t * ev);
-static void l_on_tcp_closed(struct service_t * service, struct g2s_tcp_closed_t * ev);
-static void l_on_tcp_data(struct service_t * service, struct g2s_tcp_data_t * ev);
-static void l_on_timer(struct service_t * service, uint32_t tid, int erased);
-static void l_on_tcp_connected(struct service_t * service, struct g2s_tcp_connected_t * ev);
+static void l_on_tcp_accepted(struct service_t* service, struct g2s_tcp_accepted_t * ev);
+static void l_on_tcp_closed(struct service_t* service, struct g2s_tcp_closed_t * ev);
+static void l_on_tcp_data(struct service_t* service, struct g2s_tcp_data_t * ev);
+static void l_on_timer(struct service_t* service, uint32_t tid, int erased);
+static void l_on_tcp_connected(struct service_t* service, struct g2s_tcp_connected_t * ev);
 
-static int c_connect(struct lua_State * lparser);
-static int c_send(struct lua_State * lparser);
-static int c_close(struct lua_State * lparser);
-static int c_timeout(struct lua_State * lparser);
-
+static int c_connect(struct lua_State* lparser);
+static int c_send(struct lua_State* lparser);
+static int c_close(struct lua_State* lparser);
+static int c_timeout(struct lua_State* lparser);
+static int c_unixtime(struct lua_State* lparser);
+static int c_unixtime_ms(struct lua_State* lparser);
 static void time_cb (void * ud, uint32_t tid, int erased);
 
 struct service_t {
@@ -31,6 +32,7 @@ struct service_t {
 	struct timer_t * timer;
 	uint64_t tick;
 	struct lua_State * lparser;	//lua 脚本解释器
+	int qflag;
 };
 
 struct service_t * service_new(struct gsq_t * g2s_queue, struct gsq_t * s2g_queue) {
@@ -50,6 +52,8 @@ struct service_t * service_new(struct gsq_t * g2s_queue, struct gsq_t * s2g_queu
 			{"c_send", c_send},
 			{"c_close", c_close},
 			{"c_timeout", c_timeout},
+			{"c_unixtime", c_unixtime},
+			{"c_unixtime_ms", c_unixtime_ms},
 			{NULL, NULL}
 		};
 		luaL_register(service->lparser, "c_interface", c_interface);
@@ -118,11 +122,21 @@ void service_runonce(struct service_t * service) {
 			}
 		}
 		FREE (packet);
-		if (++count%100 == 0)	//100是经验值可换成别的, 每处理100个业务包就处理一下定时器
+		if (++count%100 == 0)	{					//100是经验值可换成别的, 每处理100个业务包就处理一下定时器
 			service_tick(service, time_ms()/100);	//处理定时器	
+		}
+		if (service->qflag) {
+			gsq_notify_g(service->g2s_queue);
+			service->qflag = 0;
+		}
 	}
 
 	if (count) service_tick(service, time_ms()/100);
+	if (service->qflag) {
+		gsq_notify_g(service->g2s_queue);
+		service->qflag = 0;
+	}
+	gsq_wait_g(service->g2s_queue, 100);
 }
 
 static int lua_error_cb (lua_State* L);
@@ -203,6 +217,7 @@ int c_connect(struct lua_State * lparser) {
 	strcpy(ev->ip, ip);
 	ev->port = port;
 	gsq_push (service->s2g_queue, S2G_TCP_CONNECT, ev);
+	service->qflag = 1;
 	return 0;
 }
 
@@ -217,6 +232,7 @@ int c_send (struct lua_State * lparser) {
 	ev->dlen = len;
 	memcpy (ev->data, data, len);
 	gsq_push (service->s2g_queue, S2G_TCP_DATA, ev);
+	service->qflag = 1;
 	return 0;
 }
 
@@ -226,6 +242,7 @@ int c_close (struct lua_State * lparser) {
 	struct s2g_tcp_close_t * ev = (struct s2g_tcp_close_t*)MALLOC(sizeof(*ev));
 	ev->sid = sid;
 	gsq_push (service->s2g_queue, S2G_TCP_CLOSE, ev);
+	service->qflag = 1;
 	return 0;
 }
 
@@ -242,6 +259,17 @@ int c_timeout (struct lua_State * lparser) {
 	return 1;
 }
 
+int c_unixtime(struct lua_State* lparser) {
+	uint32_t unixtime = time_unixtime();
+	lua_pushinteger(lparser, unixtime);
+	return 1;
+}
+
+int c_unixtime_ms(struct lua_State* lparser) {
+	double ms = (double)time_ms();
+	lua_pushnumber(lparser, ms);
+	return 1;
+}
 int lua_error_cb(lua_State *L) {
     lua_getfield(L, LUA_GLOBALSINDEX, "debug");
     lua_getfield(L, -1, "traceback");

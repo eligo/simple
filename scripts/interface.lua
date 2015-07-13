@@ -2,15 +2,17 @@
 package.cpath = string.format("%s;%s?.so", package.cpath, './3rd/luaso/')	--设置外部c库的搜索路径
 local class = require("luautil.class")	--类管理器
 require("luautil.timer")	
+require("scripts.handle.test_handle")					--协议处理实现
+require("luautil.mysql")
 local timer = class.singleton("timer")	--定时器
 local json = require ('cjson')			--json 工具(encode decode)
 local responser = {_sid=nil}			--简单封装一些操作
 local handlers = class.singleton("protocol_handlers")	--协议处理集合
-require("scripts.handle.test_handle")					--协议处理实现
-require("luautil.mysql")
 ---------------------------------------------------------framework event---------------------------------------------------------
 function c_onTcpAccepted(sid)				--框架事件(连接接受)
 	print("c_onTcpAccepted", sid)
+	c_interface.c_send(sid, "hello1\r\n")
+	--timer:timeout(1, -1, function() c_interface.c_send(sid, "hello world") end)
 end
 
 function c_onTcpConnected(sid, ud)			--框架时间(连接成功)
@@ -21,7 +23,18 @@ function c_onTcpClosed(sid, ud)				--框架事件(连接断开)
 	print("c_onTcpClosed", sid, ud)
 end
 
+local i = 0
+local lasttime = 0
 function c_onTcpData(sid, str)				--框架事件(连接业务数据到达)
+	--print(str)
+	c_interface.c_send(sid, string.format("hello dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd %s\r\n", c_interface.c_unixtime_ms()))
+	i=i+1
+	if i%10000 == 0 then
+		local ctm = c_interface.c_unixtime_ms()
+		print(i, ctm - lasttime, 10000/((ctm-lasttime)/1000))
+		lasttime = ctm
+	end
+	if 1 then return end
 	responser._sid = sid
 	local ok, package = pcall(json.decode, str)
 	if not ok then
@@ -63,5 +76,6 @@ end
 function responser:sockid()
 	return self._sid
 end
---c_interface.c_connect(111, "0.0.0.0", 9999)
+c_interface.c_connect(111, "0.0.0.0", 9999)
+--timer:timeout(1, 100, function() print("hello", c_interface.c_unixtime(),c_interface.c_unixtime_ms()) end)-- 每1个滴答调用一下func, 重复100下
 

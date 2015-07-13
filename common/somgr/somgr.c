@@ -16,7 +16,8 @@
 #include <sys/wait.h>  
 #include <sys/epoll.h>
 #include <fcntl.h>
-
+#include <sys/time.h>
+#include <sys/select.h>
 struct somgr_t {
 	int ep;
 	struct so_t** sos;
@@ -29,6 +30,9 @@ struct somgr_t {
 	sorcb rcb;
 	soecb ecb;
 	soccb ccb;
+	int notify[2];
+	int waitnotify;
+	int waitting;
 };
 
 static void somgr_expand_sos(struct somgr_t* somgr);
@@ -44,24 +48,53 @@ static uint32_t so_hasstate(struct so_t* so, int sta);
 static void so_clearstate(struct so_t* so, int sta);
 
 struct somgr_t* somgr_new(void* ud, soacb a, sorcb r, soecb e, soccb c) {
+	int ep = 0;
+	int notify[2] = {0,0};
+	struct epoll_event ev;
+	memset(&ev, 0, sizeof(ev));
+	ev.events |= EPOLLIN;
 	if (!a || !r || !e || !c) return NULL;
-	int ep = epoll_create(1024);	//创建epoll设备(百度linux epoll)
-	if (ep <= 0) return NULL;
+	ep = epoll_create(1024);	//创建epoll设备(百度linux epoll)
+	if (ep <= 0) goto fail;
+	if (socketpair(AF_UNIX, SOCK_STREAM, 0, notify) < 0) goto fail;
+	if (epoll_ctl(ep, EPOLL_CTL_ADD, notify[0], &ev)) goto fail;
+	fd_setnoblock(notify[0]);
+	fd_setnoblock(notify[1]);
 	struct somgr_t* somgr = (struct somgr_t*)MALLOC(sizeof(*somgr));
-	if (somgr) {
-		memset(somgr, 0, sizeof(*somgr));
-		somgr->ep = ep;
-		somgr->ud = ud;
-		somgr->acb = a;
-		somgr->rcb = r;
-		somgr->ecb = e;
-		somgr->ccb = c;
-	}
+	memset(somgr, 0, sizeof(*somgr));
+	somgr->ep = ep;
+	somgr->ud = ud;
+	somgr->acb = a;
+	somgr->rcb = r;
+	somgr->ecb = e;
+	somgr->ccb = c;
+	somgr->notify[0] = notify[0];
+	somgr->notify[1] = notify[1];
 	return somgr;
+fail:
+	if (ep) close(ep);
+	if (notify[0]) close(notify[0]);
+	if (notify[1]) close(notify[1]);
+	return NULL;
 }
 
 void somgr_destroy(struct somgr_t* somgr) {
-	//TODO
+	int i = 0;
+	for ( ; i<somgr->sosn; ++i) {
+		struct so_t* so = somgr->sos[i];
+		if (so) {
+			if (so->fd)
+				close(so->fd);
+			FREE(so);
+		}
+	}
+	if (somgr->sos)
+		FREE(somgr->sos);
+
+	close(somgr->ep);
+	close(somgr->notify[0]);
+	close(somgr->notify[1]);
+	FREE(somgr);
 }
 
 int somgr_listen(struct somgr_t* somgr, const char* ip, int port) {
@@ -118,8 +151,7 @@ int somgr_connect(struct somgr_t* somgr, const char* ip, int port, int ud) {
 		goto fail;
 	
 	struct so_t* so = somgr_alloc_so(somgr);
-	if (!so) 
-		goto fail;
+	if (!so) goto fail;
 	
 	so->fd = fd;
 	so_setstate(so, SOS_CONNECTTING);	//添加状态"正在连接"
@@ -211,7 +243,6 @@ void somgr_proc_rw(struct somgr_t* somgr, struct so_t* so, unsigned ev) {	//处�
 	}
 
 	if (ev & EPOLLOUT) {						//该socket此刻可写
-		//printf("writable %d\n", so->id);
 		assert(!so_hasstate(so, SOS_WRITABLE));
 		assert(!so->curq);						//肯定不在待写队列
 		so_setstate(so, SOS_WRITABLE);			//设置标记该socket可写
@@ -224,7 +255,7 @@ void somgr_proc_rw(struct somgr_t* somgr, struct so_t* so, unsigned ev) {	//处�
 			so_clearstate(so, SOS_WRITABLE);	//设置成不可写, 保留事件侦听
 		}
 	}
-			
+	
 	return;
 fail:
 	somgr_remove_so(somgr, so);
@@ -289,10 +320,15 @@ void somgr_runonce(struct somgr_t* somgr, int wms) {
 		}
 	} while (1);
 
+	somgr->waitting = 1;
 	en = epoll_wait(somgr->ep, evs, 1024, wms);	//查询epoll里面所有socket事件(最多1024个,epoll内部会有排队机制,一次拿不完,多次肯定可以拿完)
+	somgr->waitting = 0;
 	for (; i < en; i++) {
 		struct so_t* so = evs[i].data.ptr;
-		if (evs[i].events & (EPOLLHUP | EPOLLERR)) {
+		if (!so) {
+			char data[1];
+			read(somgr->notify[0], data, sizeof(data));
+		} else if (evs[i].events & (EPOLLHUP | EPOLLERR)) {
 			somgr_remove_so(somgr, so);
 		} else if (so_hasstate(so, SOS_LISTEN)) {
 			somgr_proc_accept(somgr, so);
@@ -472,4 +508,30 @@ uint32_t so_hasstate(struct so_t* so, int sta) {	//是否具备sta这个状态
 
 void so_clearstate(struct so_t* so, int sta) {		//清除sta这个状态
 	so->state &= ~(1<<sta);
+}
+
+void somgr_wait_g(struct somgr_t* somgr, int ms) {	//service模块调来sleep, gate模块可以随时调用somgr_notify_s来唤醒它
+	char data[1];
+	int fd = somgr->notify[1];
+	struct timeval timeout={0,ms*1000};
+	fd_set fds;
+	FD_ZERO(&fds);
+	FD_SET(fd, &fds);
+	somgr->waitnotify = 1;
+	if (0 < select(fd+1, &fds, NULL, NULL, &timeout)) {
+		read(fd, data, sizeof(data));
+	}
+	somgr->waitnotify = 0;
+}
+
+void somgr_notify_s(struct somgr_t* somgr) {		//唤醒service(向notify[0]写入一个字节,驱动堵塞在select函数上面的service模块马上返回)
+	if (somgr->waitnotify) {
+		write(somgr->notify[0], "a", 1);
+	}
+}
+
+void somgr_notify_g(struct somgr_t* somgr) {		//唤醒gate(向nofity[1]写入一个字节,驱动堵塞在epoll_wait上的gate模块马上返回)
+	if (somgr->waitting) {
+		write(somgr->notify[1], "b", 1);
+	}
 }

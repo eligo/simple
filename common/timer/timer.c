@@ -9,8 +9,8 @@
 #include <stdio.h>
 #include <sys/time.h>
 
-static uint64_t g_currentMs = 0;
-static uint32_t g_unixtime = 0;
+static volatile uint64_t g_currentMs = 0;
+static volatile uint32_t g_unixtime = 0;
 
 struct tobjqueue_t ;
 struct tobj_t {						//用户节点(需定时的对象)

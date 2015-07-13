@@ -49,9 +49,15 @@ struct s2g_tcp_connect {
 };
 
 struct gsq_t;
-
+struct service_t;
+struct gate_t;
 struct gsq_t * gsq_new();
 void gsq_delete(struct gsq_t * gsq);
 int gsq_push(struct gsq_t * q, int type, void * ev);	//线程安全(内部已上锁)
 void * gsq_pop(struct gsq_t * q, int * type);			//线程安全(内部已上锁)
+
+void gsq_set_gs(struct gsq_t * gsq, struct gate_t* gate, struct service_t* service);
+void gsq_wait_g(struct gsq_t * gsq, int ms);
+void gsq_notify_s(struct gsq_t * gsq);
+void gsq_notify_g(struct gsq_t * gsq);
 #endif

@@ -12,6 +12,7 @@ struct gate_t {
 	struct gsq_t* g2s_queue;
 	struct gsq_t* s2g_queue;
 	struct somgr_t* somgr;
+	int qflag;
 };
 
 static int tcp_accepted(void *ud, int lid, int nid);
@@ -43,11 +44,15 @@ void gate_delete(struct gate_t * gate) {
 	}
 }
 
+struct somgr_t* gate_get_somgr(struct gate_t* gate) {
+	return gate->somgr;
+}
+
 void gate_runonce (struct gate_t * gate) {
 	uint64_t stm = time_ms();
 	uint64_t ctm = 0;
 	uint32_t count = 0;
-	int sleepms = 50;
+	int sleepms = 100;
 	do {					//处理service递交过来的请求
 		int type = 0;
 		void * packet = gsq_pop(gate->s2g_queue, &type);
@@ -86,6 +91,10 @@ void gate_runonce (struct gate_t * gate) {
 		}
 	} while(1);
 	somgr_runonce(gate->somgr, sleepms);	//处理网络读写
+	if (gate->qflag) {
+		gsq_notify_s(gate->s2g_queue);
+		gate->qflag = 0;
+	}
 }
 
 int tcp_accepted(void *ud, int lid, int nid) {	//tcp 建立时回调
@@ -93,6 +102,7 @@ int tcp_accepted(void *ud, int lid, int nid) {	//tcp 建立时回调
 	struct g2s_tcp_accepted_t * ev = (struct g2s_tcp_accepted_t*)MALLOC(sizeof(*ev));
 	ev->sid = nid;
 	gsq_push(gate->g2s_queue, G2S_TCP_ACCEPTED, ev);
+	gate->qflag = 1;
 	return 0;
 }
 
@@ -101,6 +111,7 @@ void notify_so_error(struct gate_t* gate, int id, int ui) {
 	ev->sid = id;
 	ev->ud = ui;
 	gsq_push(gate->g2s_queue, G2S_TCP_CLOSED, ev);
+	gate->qflag = 1;
 }
 
 int tcp_errored(void * ud, int id, int ui) {	//tcp 连接断开时回调
@@ -114,6 +125,7 @@ int tcp_connected (void* ud, int id, int ui) {
 	ev->sid = id;
 	ev->ud = ui;
 	gsq_push(gate->g2s_queue, G2S_TCP_CONNECTED, ev);
+	gate->qflag = 1;
 	return 0;
 }
 
@@ -137,8 +149,21 @@ int tcp_readed (void * ud, int id, char * data, int len) {	//收到数据时回�
 			start = cur + 2;
 			cur += 2;
 			gsq_push(gate->g2s_queue, G2S_TCP_DATA, ev);	//把业务数据包通过队列传给 service 模块
+			gate->qflag = 1;
 		} else
 			cur ++;
 	}
 	return readed;	//返回读取了的字节数
+}
+
+void gate_notify_s(struct gate_t* gate) {			//唤醒service
+	somgr_notify_s(gate->somgr);
+}
+
+void gate_notify_g(struct gate_t* gate) {			//唤醒gate
+	somgr_notify_g(gate->somgr);
+}
+
+void gate_wait_g(struct gate_t* gate, int ms) {		//service模块调来于等待gate事件, gate模块可以随时调用somgr_notify_s来唤醒它
+	somgr_wait_g(gate->somgr, ms);
 }

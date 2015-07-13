@@ -15,4 +15,8 @@ int somgr_listen(struct somgr_t* somgr, const char* ip, int port);
 int somgr_connect(struct somgr_t* somgr, const char* ip, int port, int ud);
 int somgr_write(struct somgr_t* somgr, int32_t id, char* data, uint32_t dlen);
 int somgr_kick(struct somgr_t* somgr, int32_t id);
+
+void somgr_notify_s(struct somgr_t* somgr);			//唤醒service
+void somgr_notify_g(struct somgr_t* somgr);			//唤醒gate
+void somgr_wait_g(struct somgr_t* somgr, int ms);	//service模块调来于等待gate事件, gate模块可以随时调用somgr_notify_s来唤醒它
 #endif
