@@ -9,15 +9,15 @@
 #include <unistd.h>
 #include "common/timer/timer.h"
 
-static void* gate_runable(void * ptr);		//gate运行线程入口
-static void* service_runable(void * ptr);	//service运行线程入口
+static void* gate_runable(void * ptr);		//gate线程入口
+static void* service_runable(void * ptr);	//service线程入口
 static void signal_handler(int signal); 	//进程信号回调
 static int _stop = 0;						//是否结束标志
 
 int main (int nargs, char** args) {
 	struct sigaction sa1;
 	sa1.sa_handler = SIG_IGN;
-	sigaction(SIGPIPE, &sa1, 0);			//屏蔽SIGPIPE信号, 这种信号相关容易发生, 写一个对方已经close掉的socket时会产生, 俗称管道破裂
+	sigaction(SIGPIPE, &sa1, 0);			//屏蔽SIGPIPE信号, 这种信号相当容易发生, 写一个对方已经close掉的socket时会产生, 俗称管道破裂
 
 	struct sigaction sa2;
 	sa2.sa_handler = signal_handler;
