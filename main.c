@@ -72,7 +72,7 @@ void* gate_runable(void * ptr) {		//驱动 gate 进行工作
 	do {
 		gate_runonce(gate);
 	} 
-	while (!_stop);
+	while (!_stop);						//TODO: break while until gate safe exit
 	
 	return NULL;
 }
@@ -82,7 +82,7 @@ void* service_runable(void * ptr) {		//驱动 service 进行工作
 	do {
 		service_runonce(service);
 	} 
-	while (!_stop);
+	while (!_stop);						//TODO: break while until service safe exit
 
 	return NULL;
 }

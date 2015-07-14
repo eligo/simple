@@ -8,18 +8,18 @@
 struct node_t {
 	int type;
 	void * ev;
-	struct node_t * next;
+	struct node_t* next;
 };
 
 struct queue_t {
-	struct node_t * head;
-	struct node_t * tail;
+	struct node_t* head;
+	struct node_t* tail;
 	int count;
 };
 
 struct gsq_t {
-	struct lock_t * lock_i;
-	struct lock_t * lock_o;
+	struct lock_t* lock_i;
+	struct lock_t* lock_o;
 	struct queue_t q0;
 	struct queue_t q1;
 	int current;
@@ -27,8 +27,8 @@ struct gsq_t {
 	struct service_t* service;
 };
 
-static int queue_push(struct queue_t * queue, int type, void * ev) {
-	struct node_t * node = (struct node_t*)MALLOC(sizeof(*node));
+static int queue_push(struct queue_t* queue, int type, void* ev) {
+	struct node_t* node = (struct node_t*)MALLOC(sizeof(*node));
 	if (node) {
 		node->type = type;
 		node->ev = ev;
@@ -49,8 +49,8 @@ static int queue_push(struct queue_t * queue, int type, void * ev) {
 	return -1;
 };
 
-static void * queue_pop(struct queue_t * queue, int * type) {
-	struct node_t * node = queue->head;
+static void * queue_pop(struct queue_t* queue, int* type) {
+	struct node_t* node = queue->head;
 	if (node) {
 		if (node == queue->tail) {
 			assert(node->next == NULL);
@@ -60,7 +60,7 @@ static void * queue_pop(struct queue_t * queue, int * type) {
 			queue->head = queue->head->next;
 		}
 		--queue->count;
-		void * ev = node->ev;
+		void* ev = node->ev;
 		*type = node->type;
 		free (node);
 		return ev;
@@ -100,7 +100,7 @@ void gsq_delete(struct gsq_t * gsq) {
 	}
 }
 
-int gsq_push(struct gsq_t * q, int type, void * ev) {
+int gsq_push(struct gsq_t* q, int type, void* ev) {
 	lock_lock(q->lock_i);
 	struct queue_t * queue = q->current == 0 ? &q->q1 : &q->q0;
 	int ret = queue_push(queue, type, ev);
@@ -108,7 +108,7 @@ int gsq_push(struct gsq_t * q, int type, void * ev) {
 	return ret;
 }
 
-void * gsq_pop(struct gsq_t * q, int * type) {
+void* gsq_pop(struct gsq_t* q, int* type) {
 	lock_lock(q->lock_o);
 	struct queue_t * queue = q->current == 0 ? &q->q0 : &q->q1;
 	void * ev = queue_pop(queue, type);
@@ -126,19 +126,19 @@ void * gsq_pop(struct gsq_t * q, int * type) {
 #include "gate.h"
 #include "service.h"
 #include "common/somgr/somgr.h"
-void gsq_set_gs(struct gsq_t * gsq, struct gate_t* gate, struct service_t* service) {
+void gsq_set_gs(struct gsq_t* gsq, struct gate_t* gate, struct service_t* service) {
 	gsq->gate = gate;
 	gsq->service = service;
 }
 
-void gsq_notify_g(struct gsq_t * gsq) {
+void gsq_notify_g(struct gsq_t* gsq) {
 	gate_notify_g(gsq->gate);
 }
 
-void gsq_notify_s(struct gsq_t * gsq) {
+void gsq_notify_s(struct gsq_t* gsq) {
 	gate_notify_s(gsq->gate);
 }
 
-void gsq_wait_g(struct gsq_t * gsq, int ms) {
+void gsq_wait_g(struct gsq_t* gsq, int ms) {
 	gate_wait_g(gsq->gate, ms);
 }

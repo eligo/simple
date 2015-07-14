@@ -5,13 +5,13 @@
 
 typedef int (*soacb) (void* ud, int lid, int nid);					//accept callback
 typedef int (*sorcb) (void* ud, int id, char * data, int len);		//read callback
-typedef int (*soecb) (void* ud, int id, int ui);			//error callback
-typedef int (*soccb) (void* ud, int id, int ui); 
+typedef int (*soecb) (void* ud, int id, int ui);					//error callback
+typedef int (*soccb) (void* ud, int id, int ui); 					//connect success callback
 struct somgr_t;
 
-struct somgr_t* somgr_new(void* ud, soacb a, sorcb r, soecb e, soccb c);
+struct somgr_t* somgr_new(void* ud, soacb a, sorcb r, soecb e, soccb c);		//创建一个socket管理器
 void somgr_destroy(struct somgr_t* somgr);
-void somgr_runonce(struct somgr_t* somgr, int wms);
+void somgr_runonce(struct somgr_t* somgr, int wms);								//外界调用来驱动一次管理器
 int somgr_listen(struct somgr_t* somgr, const char* ip, int port);
 int somgr_connect(struct somgr_t* somgr, const char* ip, int port, int ud);
 int somgr_write(struct somgr_t* somgr, int32_t id, char* data, uint32_t dlen);
