@@ -22,9 +22,9 @@ struct somgr_t {
 	int ep;
 	struct so_t** sos;
 	uint32_t sosn;
-	struct soqueue_t freesos;	//备用的socket结构
-	struct soqueue_t badsos;	//待关闭的socket
-	struct soqueue_t writesos;	//待写的socket
+	struct soqueue_t freesos;	//备用的socket, 可以重新分配的
+	struct soqueue_t badsos;	//待关闭的socket, 已经被踢掉或者已经出错的
+	struct soqueue_t writesos;	//待写的socket, 能写并且有数据要写的
 	void* ud;
 	soacb acb;
 	sorcb rcb;
@@ -54,9 +54,9 @@ struct somgr_t* somgr_new(void* ud, soacb a, sorcb r, soecb e, soccb c) {
 	memset(&ev, 0, sizeof(ev));
 	ev.events |= EPOLLIN;
 	if (!a || !r || !e || !c) return NULL;
-	ep = epoll_create(1024);	//创建epoll设备(百度linux epoll)
+	ep = epoll_create(1024);											//创建epoll设备(百度linux epoll)
 	if (ep <= 0) goto fail;
-	if (socketpair(AF_UNIX, SOCK_STREAM, 0, notify) < 0) goto fail;
+	if (socketpair(AF_UNIX, SOCK_STREAM, 0, notify) < 0) goto fail;		//创建线程通知用的一对套接字
 	if (epoll_ctl(ep, EPOLL_CTL_ADD, notify[0], &ev)) goto fail;
 	fd_setnoblock(notify[0]);
 	fd_setnoblock(notify[1]);
@@ -132,7 +132,7 @@ int somgr_connect(struct somgr_t* somgr, const char* ip, int port, int ud) {
 	int fd = socket(AF_INET, SOCK_STREAM, IPPROTO_IP);
 	if (0 > fd)	return -1;
 
-	if (fd_setnoblock(fd)) goto fail;//设置成非堵塞
+	if (fd_setnoblock(fd)) goto fail;		//设置成非堵塞
 	
 	struct sockaddr_in addr;
 	bzero(&addr, sizeof(addr));  
@@ -142,7 +142,7 @@ int somgr_connect(struct somgr_t* somgr, const char* ip, int port, int ud) {
 	errno = 0;
 	int ret = connect(fd, (struct sockaddr *)(&addr), sizeof(struct sockaddr));	//这步不会引起堵塞(因为前面fd_setnoblock)
 	if (ret < 0) {
-		if(errno != EINPROGRESS) goto fail;//EINPROGRESS表示连接中
+		if(errno != EINPROGRESS) goto fail;	//EINPROGRESS表示连接中
 	}
 	else if (0 != ret) goto fail;
 	
@@ -150,8 +150,8 @@ int somgr_connect(struct somgr_t* somgr, const char* ip, int port, int ud) {
 	if (!so) goto fail;
 	
 	so->fd = fd;
-	so_setstate(so, SOS_CONNECTTING);	//添加状态"正在连接"
-	if (somgr_add_so(somgr, so)) {		//加入epoll(仅加入可写事件,事件发生说明可以查询是否连接成功)
+	so_setstate(so, SOS_CONNECTTING);		//添加状态"正在连接"
+	if (somgr_add_so(somgr, so)) {			//加入epoll(仅加入可写事件,事件发生说明可以查询是否连接成功)
 		somgr_free_so(somgr, so);
 		goto fail;
 	}
@@ -252,7 +252,7 @@ void somgr_proc_accept(struct somgr_t* somgr, struct so_t* lso) {
 	struct so_t* so = NULL;
 	struct sockaddr addr;
 	socklen_t addrlen = sizeof(addr);
-	int fd = accept(lso->fd, &addr, &addrlen);//TODO try nore times
+	int fd = accept(lso->fd, &addr, &addrlen);//TODO try more times
 	if (fd == -1) {
 		switch (errno) {
 			case EINTR:
@@ -488,7 +488,7 @@ void so_clearstate(struct so_t* so, int sta) {		//清除sta这个状态
 	so->state &= ~(sta);
 }
 
-void somgr_wait_g(struct somgr_t* somgr, int ms) {	//service模块调来sleep, gate模块可以随时调用somgr_notify_s来唤醒它
+void somgr_wait_g(struct somgr_t* somgr, int ms) {	//别的线程(service)调来sleep, somgr随时调用somgr_notify_s来唤醒它
 	char data[1];
 	int fd = somgr->notify[1];
 	struct timeval timeout={0,ms*1000};
@@ -502,7 +502,7 @@ void somgr_wait_g(struct somgr_t* somgr, int ms) {	//service模块调来sleep, g
 	somgr->waitnotify = 0;
 }
 
-void somgr_notify_s(struct somgr_t* somgr) {		//唤醒service(向notify[0]写入一个字节,驱动堵塞在select函数上面的service模块马上返回)
+void somgr_notify_s(struct somgr_t* somgr) {		//唤醒在等待唤醒的线程(service)(向notify[0]写入一个字节,驱动堵塞在select函数上面的service模块马上返回)
 	if (somgr->waitnotify) {
 		write(somgr->notify[0], "a", 1);
 	}

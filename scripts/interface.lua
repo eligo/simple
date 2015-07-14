@@ -31,7 +31,7 @@ function c_onTcpData(sid, str)				--框架事件(连接业务数据到达)
 		c_interface.c_send(sid, "goodbye!!!\r\n")
 		c_interface.c_close(sid)	
 	end
-	c_interface.c_send(sid, string.format("welcome! current time: %s, enter 'quit' will close connection\r\n", c_interface.c_unixtime_ms()))
+	c_interface.c_send(sid, string.format("welcome! current time: %s, enter 'quit' will close connection! recved:%s\r\n", c_interface.c_unixtime_ms(), str))
 	i=i+1
 	if i%10000 == 0 then
 		local ctm = c_interface.c_unixtime_ms()
