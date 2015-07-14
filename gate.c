@@ -50,8 +50,6 @@ struct somgr_t* gate_get_somgr(struct gate_t* gate) {
 
 void gate_runonce (struct gate_t * gate) {
 	uint64_t stm = time_ms();
-	uint64_t ctm = 0;
-	uint32_t count = 0;
 	int sleepms = 100;
 	do {					//处理service递交过来的请求
 		int type = 0;
@@ -81,12 +79,9 @@ void gate_runonce (struct gate_t * gate) {
 			}
 		}
 		FREE (packet);
-		if (++count%1000 == 0) {
-			ctm = time_ms();
-			if (ctm - stm >= 50) {
-				sleepms = 0;
-				break;
-			}
+		if (time_ms() - stm >= 50) {
+			sleepms = 0;
+			break;
 		}
 	} while(1);
 	somgr_runonce(gate->somgr, sleepms);	//处理网络读写
