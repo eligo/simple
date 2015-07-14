@@ -24,7 +24,6 @@ struct g2s_tcp_closed_t {
 struct g2s_tcp_data_t {
 	int sid;
 	int dlen;
-	char * data;
 };
 
 struct g2s_tcp_connected_t {

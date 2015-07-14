@@ -60,8 +60,7 @@ void gate_runonce (struct gate_t * gate) {
 		switch (type) {
 			case S2G_TCP_DATA: {
 				struct s2g_tcp_data_t* ev = (struct s2g_tcp_data_t*)packet;
-				somgr_write(gate->somgr, ev->sid, ev->data, ev->dlen);
-				FREE(ev->data);
+				somgr_write(gate->somgr, ev->sid, (char*)ev+sizeof(*ev), ev->dlen);
 				break;
 			}
 			case S2G_TCP_CLOSE: {
@@ -140,11 +139,11 @@ int tcp_readed (void * ud, int id, char * data, int len) {	//收到数据时回�
 				return readed;
 			if (data[cur+1] != '\n')
 				return -1;	//error occur
-			struct g2s_tcp_data_t * ev = (struct g2s_tcp_data_t*)MALLOC(sizeof(*ev));
+			int plen = cur - start;
+			struct g2s_tcp_data_t * ev = (struct g2s_tcp_data_t*)MALLOC(sizeof(*ev)+plen);
 			ev->sid = id;
-			ev->dlen = cur - start;
-			ev->data = (char*)MALLOC(len);
-			memcpy(ev->data, data + start, ev->dlen);
+			ev->dlen = plen;
+			memcpy((char*)ev+sizeof(*ev), data + start, ev->dlen);
 			readed += cur - start + 2;
 			start = cur + 2;
 			cur += 2;

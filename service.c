@@ -109,7 +109,6 @@ void service_runonce(struct service_t * service) {
 			case G2S_TCP_DATA: {
 				struct g2s_tcp_data_t * ev = (struct g2s_tcp_data_t*)packet;
 				l_on_tcp_data(service, ev);
-				FREE(ev->data);
 				break;
 			}
 			case G2S_TCP_CONNECTED: {
@@ -179,7 +178,7 @@ void l_on_tcp_data (struct service_t * service, struct g2s_tcp_data_t * ev) {
 	lua_pushcfunction(lparser, lua_error_cb);
 	lua_getglobal(lparser, "c_onTcpData");
 	lua_pushnumber(lparser, ev->sid);
-	lua_pushlstring(lparser, ev->data, ev->dlen);
+	lua_pushlstring(lparser, (char*)ev+sizeof(*ev), ev->dlen);
 	lua_pcall(lparser, 2, 0, -4);
 	lua_settop(lparser, st);
 }
@@ -226,11 +225,10 @@ int c_send (struct lua_State * lparser) {
 	struct service_t * service = get_service(lparser);
 	const int sid = luaL_checkinteger(lparser, 1); 
 	const char * data = luaL_checklstring(lparser, 2, &len);
-	struct s2g_tcp_data_t * ev = (struct s2g_tcp_data_t*)MALLOC(sizeof(*ev));
+	struct s2g_tcp_data_t * ev = (struct s2g_tcp_data_t*)MALLOC(sizeof(*ev) + len);
 	ev->sid = sid;
-	ev->data = (char*)MALLOC(len);
 	ev->dlen = len;
-	memcpy (ev->data, data, len);
+	memcpy ((char*)ev+sizeof(*ev), data, len);
 	gsq_push (service->s2g_queue, S2G_TCP_DATA, ev);
 	service->qflag = 1;
 	return 0;
