@@ -84,7 +84,7 @@ void gate_runonce (struct gate_t * gate) {
 			break;
 		}
 	} while(1);
-	somgr_runonce(gate->somgr, sleepms);	//处理网络读写
+	somgr_runonce(gate->somgr, sleepms);	//查询并处理套接字事件
 	if (gate->qflag) {
 		gsq_notify_s(gate->s2g_queue);
 		gate->qflag = 0;
