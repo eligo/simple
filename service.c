@@ -135,7 +135,7 @@ void service_runonce(struct service_t * service) {
 		gsq_notify_g(service->g2s_queue);
 		service->qflag = 0;
 	}
-	gsq_wait_g(service->g2s_queue, 100);
+	gsq_notify_wait_g(service->g2s_queue, 100);
 }
 
 static int lua_error_cb (lua_State* L);

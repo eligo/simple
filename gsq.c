@@ -131,14 +131,17 @@ void gsq_set_gs(struct gsq_t* gsq, struct gate_t* gate, struct service_t* servic
 	gsq->service = service;
 }
 
-void gsq_notify_g(struct gsq_t* gsq) {
-	gate_notify_g(gsq->gate);
+void gsq_notify_s(struct gsq_t* gsq) {				//唤醒service
+	struct somgr_t * somgr = gate_notifyer(gsq->gate);
+	somgr_notify_s(somgr);
 }
 
-void gsq_notify_s(struct gsq_t* gsq) {
-	gate_notify_s(gsq->gate);
+void gsq_notify_g(struct gsq_t* gsq) {				//唤醒gate
+	struct somgr_t * somgr = gate_notifyer(gsq->gate);
+	somgr_notify_g(somgr);
 }
 
-void gsq_wait_g(struct gsq_t* gsq, int ms) {
-	gate_wait_g(gsq->gate, ms);
+void gsq_notify_wait_g(struct gsq_t* gsq, int ms) {	//service模块调来于等待gate事件, gate模块可以随时调用somgr_notify_s来唤醒它
+	struct somgr_t * somgr = gate_notifyer(gsq->gate);
+	somgr_notify_wait_g(somgr, ms);
 }

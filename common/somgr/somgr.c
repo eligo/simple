@@ -485,7 +485,19 @@ void so_clearstate(struct so_t* so, int sta) {		//清除sta这个状态
 	so->state &= ~(sta);
 }
 
-void somgr_wait_g(struct somgr_t* somgr, int ms) {	//别的线程(service)调来sleep, somgr随时调用somgr_notify_s来唤醒它
+void somgr_notify_s(struct somgr_t* somgr) {		//唤醒在等待唤醒的线程(service)(向notify[0]写入一个字节,驱动堵塞在select函数上面的service模块马上返回)
+	if (somgr->waitnotify) {
+		write(somgr->notify[0], "a", 1);
+	}
+}
+
+void somgr_notify_g(struct somgr_t* somgr) {		//唤醒gate(向nofity[1]写入一个字节,驱动堵塞在epoll_wait上的gate模块马上返回)
+	if (somgr->waitting) {
+		write(somgr->notify[1], "b", 1);
+	}
+}
+
+void somgr_notify_wait_g(struct somgr_t* somgr, int ms) {	//别的线程(service)调来sleep, somgr随时调用somgr_notify_s来唤醒它
 	char data[1];
 	int fd = somgr->notify[1];
 	struct timeval timeout={0,ms*1000};
@@ -497,16 +509,4 @@ void somgr_wait_g(struct somgr_t* somgr, int ms) {	//别的线程(service)调来
 		read(fd, data, sizeof(data));
 	}
 	somgr->waitnotify = 0;
-}
-
-void somgr_notify_s(struct somgr_t* somgr) {		//唤醒在等待唤醒的线程(service)(向notify[0]写入一个字节,驱动堵塞在select函数上面的service模块马上返回)
-	if (somgr->waitnotify) {
-		write(somgr->notify[0], "a", 1);
-	}
-}
-
-void somgr_notify_g(struct somgr_t* somgr) {		//唤醒gate(向nofity[1]写入一个字节,驱动堵塞在epoll_wait上的gate模块马上返回)
-	if (somgr->waitting) {
-		write(somgr->notify[1], "b", 1);
-	}
 }

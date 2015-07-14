@@ -150,14 +150,6 @@ int tcp_readed (void * ud, int id, char * data, int len) {	//收到数据时回�
 	return readed;	//返回读取了的字节数
 }
 
-void gate_notify_s(struct gate_t* gate) {			//唤醒service
-	somgr_notify_s(gate->somgr);
-}
-
-void gate_notify_g(struct gate_t* gate) {			//唤醒gate
-	somgr_notify_g(gate->somgr);
-}
-
-void gate_wait_g(struct gate_t* gate, int ms) {		//service模块调来于等待gate事件, gate模块可以随时调用somgr_notify_s来唤醒它
-	somgr_wait_g(gate->somgr, ms);
+void* gate_notifyer(struct gate_t* gate) {
+	return gate->somgr;
 }
