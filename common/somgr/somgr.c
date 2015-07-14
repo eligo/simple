@@ -101,8 +101,7 @@ void somgr_destroy(struct somgr_t* somgr) {
 int somgr_listen(struct somgr_t* somgr, const char* ip, int port) {
 	int err = 0;
 	int fd = socket(AF_INET, SOCK_STREAM, IPPROTO_IP);
-	if (fd <= 0) 
-		return -6;
+	if (fd <= 0) return -6;
 
 	struct sockaddr_in addr;
 	bzero(&addr, sizeof(addr));  
@@ -131,11 +130,9 @@ fail:
 
 int somgr_connect(struct somgr_t* somgr, const char* ip, int port, int ud) {
 	int fd = socket(AF_INET, SOCK_STREAM, IPPROTO_IP);
-	if (0 > fd)	
-		return -1;
+	if (0 > fd)	return -1;
 
-	if (fd_setnoblock(fd)) //设置成非堵塞
-		goto fail;
+	if (fd_setnoblock(fd)) goto fail;//设置成非堵塞
 	
 	struct sockaddr_in addr;
 	bzero(&addr, sizeof(addr));  
@@ -145,11 +142,9 @@ int somgr_connect(struct somgr_t* somgr, const char* ip, int port, int ud) {
 	errno = 0;
 	int ret = connect(fd, (struct sockaddr *)(&addr), sizeof(struct sockaddr));	//这步不会引起堵塞(因为前面fd_setnoblock)
 	if (ret < 0) {
-		if(errno != EINPROGRESS)	//EINPROGRESS表示连接中
-			goto fail;
+		if(errno != EINPROGRESS) goto fail;//EINPROGRESS表示连接中
 	}
-	else if (0 != ret)
-		goto fail;
+	else if (0 != ret) goto fail;
 	
 	struct so_t* so = somgr_alloc_so(somgr);
 	if (!so) goto fail;
@@ -172,8 +167,7 @@ int somgr_flush_so(struct somgr_t* somgr, struct so_t* so) {
 	int wn = 0;
 dowrite:
 	dn = sbuf_cur(&so->wbuf);
-	if (dn == 0) 
-		return 0;
+	if (dn == 0) return 0;
 	
 	wn = write(so->fd, so->wbuf.ptr, dn);	//调用系统api把数据从本地缓冲区写到系统缓冲区
 	if (wn > 0) {
@@ -199,10 +193,8 @@ void somgr_proc_connected(struct somgr_t* somgr, struct so_t* so) {
 	int err = -1;
 	socklen_t len = sizeof(err);
 	if (0 == getsockopt(so->fd, SOL_SOCKET, SO_ERROR, &err, &len) && err == 0) {	//连接过程中没有错误发生, 说明连接上了
-		if (somgr_mod_so(somgr, so, 0))	//重置感兴趣的事件(读事件)
-			goto fail;
-	} else 
-		goto fail;
+		if (somgr_mod_so(somgr, so, 0))	goto fail; 									//重置感兴趣的事件(读事件)
+	} else goto fail;
 
 	so_setstate(so, SOS_WRITABLE);			//这个时候可以认为该socket可写
 	so_clearstate(so, SOS_CONNECTTING);		//清除'正在连接'状态
@@ -218,8 +210,7 @@ void somgr_proc_rw(struct somgr_t* somgr, struct so_t* so, unsigned ev) {	//处�
 	if (ev & EPOLLIN) {		//可读
 		fz = sbuf_freesz(&so->rbuf);
 		if (fz == 0) {
-			if (sbuf_expand(&so->rbuf, so->rbuf.cap == 0? 1024 : so->rbuf.cap))	//扩展接收缓冲区
-				goto fail;
+			if (sbuf_expand(&so->rbuf, so->rbuf.cap == 0? 1024 : so->rbuf.cap))	goto fail; //扩展接收缓冲区
 			fz = sbuf_freesz(&so->rbuf);
 		}
 		rn = read(so->fd, sbuf_cptr(&so->rbuf), fz);	//操作系统读取调用
@@ -227,33 +218,28 @@ void somgr_proc_rw(struct somgr_t* somgr, struct so_t* so, unsigned ev) {	//处�
 			assert(rn <= fz);
 			sbuf_writed(&so->rbuf, rn);
 			pn = somgr->rcb(somgr->ud, so->id, so->rbuf.ptr, so->rbuf.cur);
-			if (pn < 0 || pn > so->rbuf.cur)  
-				goto fail;
+			if (pn < 0 || pn > so->rbuf.cur) goto fail;
 			sbuf_readed(&so->rbuf, pn);
-			if (so_hasstate(so, SOS_BAD)) //因为rcb可能会把该socket kick 掉， 所以检查一下是有必要的
-				goto fail;
+			if (so_hasstate(so, SOS_BAD)) goto fail;	//因为rcb可能会把该socket kick 掉， 所以检查一下是有必要的
 		} else if (rn < 0) {
 			switch (errno) {
 				case EAGAIN:	//没有内容可读
 				case EINTR:		//读的过程中被系统中断, 可以下次再重试操作
 					return;
-				default:
-					goto fail;
+				default: goto fail;
 			}
 		} else goto fail;
 	}
 
-	if (ev & EPOLLOUT) {						//该socket此刻可写
+	if (ev & EPOLLOUT) {								//该socket此刻可写
 		assert(!so_hasstate(so, SOS_WRITABLE));
-		assert(!so->curq);						//肯定不在待写队列
-		so_setstate(so, SOS_WRITABLE);			//设置标记该socket可写
-		if (0 != somgr_flush_so(somgr, so))		//可写的时候把还没有发送的内容刷到系统缓冲区
-			goto fail;
-		if (sbuf_cur(&so->wbuf) == 0) {			//数据全发出去了
-			if (somgr_mod_so(somgr, so, 0))		//重写设置感兴趣的事件(取消可写事件)
-				goto fail;
-		} else {								//依然有数据没推出, 说明状态又变成了不可写
-			so_clearstate(so, SOS_WRITABLE);	//设置成不可写, 保留事件侦听
+		assert(!so->curq);								//肯定不在待写队列
+		so_setstate(so, SOS_WRITABLE);					//设置标记该socket可写
+		if (0 != somgr_flush_so(somgr, so)) goto fail;	//可写的时候把还没有发送的内容刷到系统缓冲区
+		if (sbuf_cur(&so->wbuf) == 0) {					//数据全发出去了
+			if (somgr_mod_so(somgr, so, 0)) goto fail;	//重写设置感兴趣的事件(取消可写事件)
+		} else {										//依然有数据没推出, 说明状态又变成了不可写
+			so_clearstate(so, SOS_WRITABLE);			//设置成不可写, 保留事件侦听
 		}
 	}
 	
@@ -273,8 +259,7 @@ void somgr_proc_accept(struct somgr_t* somgr, struct so_t* lso) {
 			case EAGAIN:
 			case EMFILE:
 				return;				//可以留到下一次尝试
-			default:
-				goto e_fderr1;
+			default: goto e_fderr1;
 		}
 	} else if (fd == 0)
 		goto e_fderr2;
@@ -349,20 +334,17 @@ int somgr_write(struct somgr_t* somgr, int32_t id, char* data, uint32_t dlen) {
 	struct so_t* so = somgr->sos[id];
 	if (so_hasstate(so, SOS_BAD | SOS_LISTEN | SOS_FREE | SOS_CONNECTTING)) return -2;
 	uint32_t fz = sbuf_freesz(&so->wbuf);
-	if (fz < dlen) {								//本地缓存放不下
-		if (so_hasstate(so, SOS_WRITABLE) && sbuf_cur(&so->wbuf) > 0) {		//如果有机会发送一些
-			if (0 != somgr_flush_so(somgr, so))		//尝试发送一些，好挪出一点本地缓存
-				goto fail;
-			if (sbuf_cur(&so->wbuf) > 0) {			//说明变成不可写了
-				so_clearstate(so, SOS_WRITABLE);	//改成不可写状态
-				if (somgr_mod_so(somgr, so, 1))		//重置epoll事件(加入可写事件侦听)
-					goto fail;
+	if (fz < dlen) {													//本地缓存放不下
+		if (so_hasstate(so, SOS_WRITABLE) && sbuf_cur(&so->wbuf) > 0) {	//如果有机会发送一些
+			if (0 != somgr_flush_so(somgr, so))	goto fail;				//尝试发送一些，好挪出一点本地缓存
+			if (sbuf_cur(&so->wbuf) > 0) {								//说明变成不可写了
+				so_clearstate(so, SOS_WRITABLE);						//改成不可写状态
+				if (somgr_mod_so(somgr, so, 1)) goto fail;				//重置epoll事件(加入可写事件侦听)
 			}
 			fz = sbuf_freesz(&so->wbuf);
 		}
-		if (fz < dlen) {							//还是不够
-			if (sbuf_expand(&so->wbuf, dlen - fz))	//只好扩展本地缓存空间了
-				goto fail;
+		if (fz < dlen) {												//还是不够
+			if (sbuf_expand(&so->wbuf, dlen - fz)) goto fail;			//只好扩展本地缓存空间了
 		}
 	}
 	memcpy(sbuf_cptr(&so->wbuf), data, dlen);		//仅拷贝到本地缓存而不立刻发送(相当于累多点一次性发, 是为了优化调用write的次数)
@@ -453,12 +435,10 @@ int somgr_add_so(struct somgr_t* somgr, struct so_t* so) {
 	} else {
 		ev.events |= EPOLLIN;
 		so_setstate(so, SOS_WRITABLE);		//对于别的正常socket， 只对可读取感兴趣
-		if (so_setnoblock(so)) 
-			return -1;
+		if (so_setnoblock(so)) return -1;
 	}
 	ev.data.ptr = so;
-	if (epoll_ctl(somgr->ep, EPOLL_CTL_ADD, so->fd, &ev))
-		return -2;
+	if (epoll_ctl(somgr->ep, EPOLL_CTL_ADD, so->fd, &ev)) return -2;
 	return 0;
 }
 
@@ -466,17 +446,15 @@ int somgr_mod_so(struct somgr_t* somgr, struct so_t* so, int w) {	//修改感兴
 	struct epoll_event ev;
 	memset(&ev, 0, sizeof(ev));
 	ev.events |= EPOLLERR | EPOLLHUP | EPOLLIN;
-	if (w) {
+	if (w) 
 		ev.events |= EPOLLOUT;
-	}
 	ev.data.ptr = so;
-	if (epoll_ctl(somgr->ep, EPOLL_CTL_MOD, so->fd, &ev))
-		return -1;
+	if (epoll_ctl(somgr->ep, EPOLL_CTL_MOD, so->fd, &ev)) return -1;
 	return 0;
 }
 
 void somgr_free_so(struct somgr_t* somgr, struct so_t* so) {
-	if (so->fd)
+	if (so->fd) 
 		close(so->fd);
 	so->fd = 0;
 	so->state = 0;
@@ -496,7 +474,6 @@ int fd_setnoblock(int fd) {
 
 int so_setnoblock(struct so_t* so) {	//设置socket描述符为非阻塞(read, write, connect 操作不会堵塞线程)
 	return fd_setnoblock(so->fd);
-	return 0;
 }
 
 void so_setstate(struct so_t* so, int sta) {		//添加sta这个状态
