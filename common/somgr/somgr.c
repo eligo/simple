@@ -1,7 +1,6 @@
 #include "somgr.h"
 #include "so_util.h"
 #include "../global.h"
-
 #include <stdio.h>  
 #include <unistd.h>  
 #include <errno.h> 
@@ -177,7 +176,6 @@ dowrite:
 	} else if (wn < 0) {
 		switch (errno) {
 			case EAGAIN:	//写不进了, 对方接收过慢会产生这种情况(tcp滑动窗口机制)
-				printf("write EAGAIN %d\n", so->id);
 				return 0;
 			case EINTR:		//被系统中断打断, 可继续尝试
 				goto dowrite;
@@ -293,10 +291,9 @@ void somgr_runonce(struct somgr_t* somgr, int wms) {
 		somgr_free_so(somgr, so);
 	} while(1);
 
-	do {	//处理有数要发送且当前状态为可写的socket
+	do {	//处理有数据要发送且当前状态为可写的socket
 		struct so_t* so = soqueue_pop(&somgr->writesos);
 		if (!so) break;
-		//printf("flush %d\n", so->id);
 		if (somgr_flush_so(somgr, so)) {		//真正发送
 			somgr_remove_so(somgr, so);
 		} else if (sbuf_cur(&so->wbuf) > 0) {	//还有数据没推出去说明该socket变成不可写了
@@ -306,9 +303,9 @@ void somgr_runonce(struct somgr_t* somgr, int wms) {
 		}
 	} while (1);
 
-	somgr->waitting = 1;
+	somgr->waitting = 1;						//标志somgr当前正在查询, 这个状态不用非常严格, 仅在唤醒这一块有一点用
 	en = epoll_wait(somgr->ep, evs, 1024, wms);	//查询epoll里面所有socket事件(最多1024个,epoll内部会有排队机制,一次拿不完,多次肯定可以拿完)
-	somgr->waitting = 0;
+	somgr->waitting = 0;						//取消正在查询状态
 	for (; i < en; i++) {
 		struct so_t* so = evs[i].data.ptr;
 		if (!so) {
@@ -337,21 +334,21 @@ int somgr_write(struct somgr_t* somgr, int32_t id, char* data, uint32_t dlen) {
 	if (fz < dlen) {													//本地缓存放不下
 		if (so_hasstate(so, SOS_WRITABLE) && sbuf_cur(&so->wbuf) > 0) {	//如果有机会发送一些
 			if (0 != somgr_flush_so(somgr, so))	goto fail;				//尝试发送一些，好挪出一点本地缓存
-			if (sbuf_cur(&so->wbuf) > 0) {								//说明变成不可写了
-				so_clearstate(so, SOS_WRITABLE);						//改成不可写状态
-				if (somgr_mod_so(somgr, so, 1)) goto fail;				//重置epoll事件(加入可写事件侦听)
+			if (sbuf_cur(&so->wbuf) > 0) {								//还有数据没推完, 说明变成不可写了
+				so_clearstate(so, SOS_WRITABLE);						//置成不可写状态
+				if (somgr_mod_so(somgr, so, 1)) goto fail;				//重新设置该so感兴趣的事件(read write)
 			}
 			fz = sbuf_freesz(&so->wbuf);
 		}
-		if (fz < dlen) {												//还是不够
+		if (fz < dlen) {												//空间还是不够
 			if (sbuf_expand(&so->wbuf, dlen - fz)) goto fail;			//只好扩展本地缓存空间了, TODO 扩展内存上限
 		}
 	}
 	memcpy(sbuf_cptr(&so->wbuf), data, dlen);		//仅拷贝到本地缓存而不立刻发送(相当于累多点一次性发, 是为了优化调用write的次数)
 	sbuf_writed(&so->wbuf, dlen);					//维护本地缓存
-	if (so_hasstate(so, SOS_WRITABLE)) {			//当前为可写状态
-		if (!so->curq)								//如果不在待写队列
-			soqueue_push(&somgr->writesos, so); 	//加入待写队列, 待写队列会在下一帧再真正发送这些数据
+	if (so_hasstate(so, SOS_WRITABLE)) {			//如果so可写
+		if (!so->curq)								//又不在待写队列
+			soqueue_push(&somgr->writesos, so); 	//则加入待写队列, 待写队列会在下一帧再真正发送这些数据
 		else
 			assert(&somgr->writesos == so->curq);
 	} else {									
@@ -472,7 +469,7 @@ int fd_setnoblock(int fd) {
 	return 0;
 }
 
-int so_setnoblock(struct so_t* so) {	//设置socket描述符为非阻塞(read, write, connect 操作不会堵塞线程)
+int so_setnoblock(struct so_t* so) {				//设置socket描述符为非阻塞(read, write, connect 操作不会堵塞线程)
 	return fd_setnoblock(so->fd);
 }
 
