@@ -201,7 +201,6 @@ void uq_erase(struct tobjqueue_t * tick, struct tobj_t * tobj) {
 		tick->head = NULL;
 		tick->tail = NULL;
 	}
-
 	tobj->next = NULL;
 	tobj->prev = NULL;
 	tobj->container = NULL;
