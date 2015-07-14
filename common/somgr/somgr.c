@@ -344,7 +344,7 @@ int somgr_write(struct somgr_t* somgr, int32_t id, char* data, uint32_t dlen) {
 			fz = sbuf_freesz(&so->wbuf);
 		}
 		if (fz < dlen) {												//还是不够
-			if (sbuf_expand(&so->wbuf, dlen - fz)) goto fail;			//只好扩展本地缓存空间了
+			if (sbuf_expand(&so->wbuf, dlen - fz)) goto fail;			//只好扩展本地缓存空间了, TODO 扩展内存上限
 		}
 	}
 	memcpy(sbuf_cptr(&so->wbuf), data, dlen);		//仅拷贝到本地缓存而不立刻发送(相当于累多点一次性发, 是为了优化调用write的次数)
