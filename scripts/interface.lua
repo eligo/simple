@@ -8,13 +8,6 @@ local timer = class.singleton("timer")	--定时器
 local json = require ('cjson')			--json 工具(encode decode)
 local responser = {_sid=nil}			--简单封装一些操作
 local handlers = class.singleton("protocol_handlers")	--协议处理集合
-local s = require("lmysql")
-local c, i = s:connect("db1", "root", "", "0.0.0.0", 3306)
-assert(c)
-print(c:delete("user", "charId>=1"))
-for i = 1, 100 do
-        print(c:insert("user", {charId=i}))
-end
 ---------------------------------------------------------framework event---------------------------------------------------------
 function c_onTcpAccepted(sid)				--框架事件(连接接受)
 	print("c_onTcpAccepted", sid)
