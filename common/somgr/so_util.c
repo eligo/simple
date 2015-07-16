@@ -109,3 +109,5 @@ void soqueue_erase(struct so_t* so) {
 	so->curq = NULL;
 	--q->num;
 }
+
+uint32_t soqueue_num(struct soqueue_t* q) {return q->num;}

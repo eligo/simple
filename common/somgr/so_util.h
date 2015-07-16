@@ -8,6 +8,7 @@ enum SOSTATE {
 	SOS_CONNECTTING = 1 << 2,
 	SOS_BAD = 1 << 3,
 	SOS_FREE = 1 << 4,
+	SOS_READABLE = 1 << 5,
 };
 
 struct sbuf_t {
@@ -46,4 +47,5 @@ void sbuf_reset(struct sbuf_t* sbuf);					//格式化该缓存
 struct so_t* soqueue_pop(struct soqueue_t* q);			//弹出socket队列
 void soqueue_push(struct soqueue_t* q, struct so_t* so);//压进socket队列
 void soqueue_erase(struct so_t* so);					//把socket从队列里面删除
+uint32_t soqueue_num(struct soqueue_t* q);
 #endif

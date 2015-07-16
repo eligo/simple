@@ -223,7 +223,7 @@ void somgr_proc_rw(struct somgr_t* somgr, struct so_t* so, unsigned ev) {	//处�
 			switch (errno) {
 				case EAGAIN:	//没有内容可读
 				case EINTR:		//读的过程中被系统中断, 可以下次再重试操作
-					return;
+					break;
 				default: goto fail;
 			}
 		} else goto fail;

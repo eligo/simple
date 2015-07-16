@@ -18,7 +18,7 @@ function Client:__init(id)
 	self._state = 0
 	self._sid = 0
 	self._watting = 0
-	self._data = string.format("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA%5sBBBBB\r\n", self._id)
+	self._data = string.format("ping\r\n", self._id)
 end
 
 function Client:send()
@@ -30,19 +30,20 @@ function Client:send()
 	self._state = 3
 end
 
-function Client:onTimer()
+--[[function Client:onTimer()
 	if self._state == 0 then
 		self._state = 1
 		c_interface.c_connect(self._id, "0.0.0.0", 9999)
 	elseif self._state == 2 then
 		self:send()
 	end
-end
+end]]
 
 function Client:onConn(sid)
 	self._sid = sid
 	self._state = 2
 	self._watting = 0
+	self:send()
 end
 
 function Client:onClose()
@@ -67,8 +68,10 @@ end
 
 local _clients = {}
 local _sidc = {}
-for i=1, 1000 do
+for i=1, 1 do
 	_clients[i] = Client(i)
+	_clients[i]._state = 1
+	c_interface.c_connect(i, "0.0.0.0", 9999)
 end
 
 ---------------------------------------------------------framework event---------------------------------------------------------
@@ -125,13 +128,13 @@ end
 function responser:sockid()
 	return self._sid
 end
-
+--[[
 timer:timeout(1,-1,function()
 	for k, v in pairs(_clients) do
 		v:onTimer()
 	end
 end)
-
+--]]
 timer:timeout(10,-1,function()
 						local ctm = c_interface.c_unixtime_ms()
 						--if ctm - lasttime >= 1000 then

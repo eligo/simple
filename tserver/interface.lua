@@ -39,7 +39,7 @@ function c_onTcpData(sid, str)				--框架事件(连接业务数据到达)
 		c_interface.c_send(sid, "goodbye!!!\r\n")
 		c_interface.c_close(sid)	
 	end
-	c_interface.c_send(sid, str.."\r\n")--string.format("welcome! current time: %s, enter 'quit' will close connection! recved:%s\r\n", c_interface.c_unixtime_ms(), str))
+	c_interface.c_send(sid, "pong\r\n")--string.format("welcome! current time: %s, enter 'quit' will close connection! recved:%s\r\n", c_interface.c_unixtime_ms(), str))
 	total = total + 1
 	bytes = bytes + string.len(str)
 	--[[
