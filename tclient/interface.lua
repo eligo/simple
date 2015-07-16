@@ -18,16 +18,19 @@ function Client:__init(id)
 	self._state = 0
 	self._sid = 0
 	self._watting = 0
-	self._data = string.format("ping\r\n", self._id)
+	self._inc = 1
+	--self._data = nil--= string.format("ping\r\n", self._id)
+	self._tms = {}
 end
 
 function Client:send()
-	if self._watting ~= 0 then return end
-	if self._state ~= 2 then return end
-	c_interface.c_send(self._sid, self._data)
-	--print("send", self._sid, self._data)
-	self._watting = c_interface.c_unixtime_ms()
-	self._state = 3
+	--if self._watting ~= 0 then return end
+	--if self._state ~= 2 then return end
+	self._tms[self._inc] = c_interface.c_unixtime_ms()
+	c_interface.c_send(self._sid, self._inc.."\r\n")
+	self._inc = self._inc + 1
+	--self._watting = c_interface.c_unixtime_ms()
+	--self._state = 3
 end
 
 --[[function Client:onTimer()
@@ -52,15 +55,15 @@ function Client:onClose()
 end
 
 local ctm = 0
-function Client:onData(da)
+function Client:onData(data)
 	ctm = c_interface.c_unixtime_ms()
-	assert(self._watting ~= 0)
-	assert(self._state == 3)
-	delays = delays + ctm - self._watting
+	--assert(self._watting ~= 0)
+	--assert(self._state == 3)
+	local inc = tonumber(data)
+	assert(self._tms[inc], data)
+	delays = delays + ctm - self._tms[inc]
+	self._tms[inc] = nil
 	sn = sn + 1
-	--if  > 100 then
-	--	print(self._id, "cost:", ctm - self._watting)
-	--end
 	self._watting = 0
 	self._state = 2
 	self:send()
@@ -68,7 +71,7 @@ end
 
 local _clients = {}
 local _sidc = {}
-for i=1, 1 do
+for i=1, 20 do
 	_clients[i] = Client(i)
 	_clients[i]._state = 1
 	c_interface.c_connect(i, "0.0.0.0", 9999)
@@ -128,13 +131,16 @@ end
 function responser:sockid()
 	return self._sid
 end
---[[
+
 timer:timeout(1,-1,function()
 	for k, v in pairs(_clients) do
-		v:onTimer()
+		--v:onTimer()
+		if v._state > 1 then
+			v:send()
+		end
 	end
 end)
---]]
+
 timer:timeout(10,-1,function()
 						local ctm = c_interface.c_unixtime_ms()
 						--if ctm - lasttime >= 1000 then
