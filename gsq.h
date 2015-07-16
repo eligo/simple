@@ -6,10 +6,12 @@ enum GS_EV {
 	G2S_TCP_CLOSED,
 	G2S_TCP_DATA,
 	G2S_TCP_CONNECTED,
+	G2S_TCP_LISTENED,
 
 	S2G_TCP_DATA,
 	S2G_TCP_CLOSE,
 	S2G_TCP_CONNECT,
+	S2G_TCP_LISTEN,
 };
 
 struct g2s_tcp_accepted_t {
@@ -31,6 +33,11 @@ struct g2s_tcp_connected_t {
 	int ud;
 };
 
+struct g2s_tcp_listened_t {
+	int sid;
+	int ud;
+};
+
 struct s2g_tcp_data_t {
 	int sid;
 	int dlen;
@@ -42,6 +49,12 @@ struct s2g_tcp_close_t {
 };
 
 struct s2g_tcp_connect {
+	char* ip;
+	int port;
+	int ud;
+};
+
+struct s2g_tcp_listen {
 	char* ip;
 	int port;
 	int ud;

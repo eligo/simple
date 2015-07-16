@@ -15,12 +15,14 @@ static void signal_handler(int signal); 	//进程信号回调
 static int _stop = 0;						//是否结束标志
 
 int main (int nargs, char** args) {
-	struct sigaction sa1;
+	if (nargs < 2) {
+		fprintf(stderr, "missing script path, such as : ./simple server, server was script path!\n");
+		return 1;
+	}
+	struct sigaction sa1, sa2;
 	sa1.sa_handler = SIG_IGN;
-	sigaction(SIGPIPE, &sa1, 0);			//屏蔽SIGPIPE信号, 这种信号相当容易发生, 写一个对方已经close掉的socket时会产生, 俗称管道破裂
-
-	struct sigaction sa2;
 	sa2.sa_handler = signal_handler;
+	sigaction(SIGPIPE, &sa1, 0);			//屏蔽SIGPIPE信号, 这种信号相当容易发生, 写一个对方已经close掉的socket时会产生, 俗称管道破裂
 	sigaction(SIGINT, &sa2, 0);				//添加SIGINT(ctrl + c) SIGTERM (kill pid) 信号处理
 	sigaction(SIGTERM, &sa2, 0);
 
@@ -28,21 +30,14 @@ int main (int nargs, char** args) {
 	pthread_t service_thread;				//service线程句柄
 	struct gsq_t * g2s_queue = gsq_new();	//消息队列 gate -> service
 	struct gsq_t * s2g_queue = gsq_new();	//消息队列 service -> gate
-	int port = 9999;
-	if (nargs > 1)
-		port = atoi(args[1]);
-
-	time_global_reset();
-	struct gate_t * gate = gate_new(port, g2s_queue, s2g_queue);		//创建 gate 模块, 负责用户接入
+	time_global_reset();					//初始化系统时间
+	struct gate_t * gate = gate_new(g2s_queue, s2g_queue);		//创建gate模块, 负责用户接入
 	if (!gate) {
 		fprintf(stderr, "gate fail\n");
 		return -1;
-	} else {
-		if (port)
-			fprintf(stderr, "server listen on port:%d\n", port);
 	}
 
-	struct service_t * service = service_new(g2s_queue, s2g_queue);		//创建 service 模块, 负责业务处理, gate 把客户端消息通过消息队列 g2s_qeueue 传递给 service 模块处理
+	struct service_t * service = service_new(g2s_queue, s2g_queue, args[1]);		//创建 service 模块, 负责业务处理, gate 把客户端消息通过消息队列 g2s_qeueue 传递给 service 模块处理
 	if (!service) {
 		fprintf(stderr, "service fail\n");
 		return -2;

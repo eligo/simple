@@ -12,20 +12,6 @@
 #include "lualib.h"
 #include "lauxlib.h"
 
-static void l_on_tcp_accepted(struct service_t* service, struct g2s_tcp_accepted_t * ev);
-static void l_on_tcp_closed(struct service_t* service, struct g2s_tcp_closed_t * ev);
-static void l_on_tcp_data(struct service_t* service, struct g2s_tcp_data_t * ev);
-static void l_on_timer(struct service_t* service, uint32_t tid, int erased);
-static void l_on_tcp_connected(struct service_t* service, struct g2s_tcp_connected_t * ev);
-
-static int c_connect(struct lua_State* lparser);
-static int c_send(struct lua_State* lparser);
-static int c_close(struct lua_State* lparser);
-static int c_timeout(struct lua_State* lparser);
-static int c_unixtime(struct lua_State* lparser);
-static int c_unixtime_ms(struct lua_State* lparser);
-static void time_cb (void * ud, uint32_t tid, int erased);
-
 struct service_t {
 	struct gsq_t* g2s_queue;
 	struct gsq_t* s2g_queue;
@@ -35,7 +21,23 @@ struct service_t {
 	int qflag;
 };
 
-struct service_t * service_new(struct gsq_t * g2s_queue, struct gsq_t * s2g_queue) {
+static void l_on_tcp_accepted(struct service_t* service, struct g2s_tcp_accepted_t * ev);
+static void l_on_tcp_closed(struct service_t* service, struct g2s_tcp_closed_t * ev);
+static void l_on_tcp_data(struct service_t* service, struct g2s_tcp_data_t * ev);
+static void l_on_timer(struct service_t* service, uint32_t tid, int erased);
+static void l_on_tcp_connected(struct service_t* service, struct g2s_tcp_connected_t * ev);
+static void l_on_tcp_listened(struct service_t* service, struct g2s_tcp_listened_t * ev);
+
+static int c_listen(struct lua_State* lparser);
+static int c_connect(struct lua_State* lparser);
+static int c_send(struct lua_State* lparser);
+static int c_close(struct lua_State* lparser);
+static int c_timeout(struct lua_State* lparser);
+static int c_unixtime(struct lua_State* lparser);
+static int c_unixtime_ms(struct lua_State* lparser);
+static void time_cb (void * ud, uint32_t tid, int erased);
+
+struct service_t * service_new(struct gsq_t * g2s_queue, struct gsq_t * s2g_queue, const char* scriptpath) {
 	struct service_t * service = (struct service_t*)MALLOC(sizeof(*service));
 	if (service) {
 		service->g2s_queue = g2s_queue;
@@ -47,7 +49,9 @@ struct service_t * service_new(struct gsq_t * g2s_queue, struct gsq_t * s2g_queu
 		lua_pushstring(service->lparser, "service_ptr");
 		lua_pushlightuserdata (service->lparser, (void *)service);
 		lua_settable(service->lparser, LUA_REGISTRYINDEX);
+		//注入c函数
 		struct luaL_Reg c_interface[] = {
+			{"c_listen", c_listen},
 			{"c_connect", c_connect},
 			{"c_send", c_send},
 			{"c_close", c_close},
@@ -57,12 +61,28 @@ struct service_t * service_new(struct gsq_t * g2s_queue, struct gsq_t * s2g_queu
 			{NULL, NULL}
 		};
 		luaL_register(service->lparser, "c_interface", c_interface);
-		if (luaL_dofile(service->lparser, "scripts/interface.lua") != 0) {
+		//设置脚本搜索路径
+		size_t plen=0;
+		lua_getglobal(service->lparser, "package");
+		lua_getfield(service->lparser, -1, "path");
+		const char* path = luaL_checklstring(service->lparser, -1, &plen);
+		char* npath = MALLOC(plen + strlen(scriptpath) + 8);
+		sprintf(npath, "%s;%s/?.lua", path, scriptpath);
+		lua_pushstring(service->lparser, npath);
+		lua_setfield(service->lparser, -3, "path");
+		FREE(npath);
+		//加载脚本入口
+		char* loadf = MALLOC(strlen(scriptpath) + sizeof("/interface.lua") + 1);
+		strcpy(loadf, scriptpath);
+		strcat(loadf, "/interface.lua");
+		if (luaL_dofile(service->lparser, loadf) != 0) {
 			fprintf(stderr, "%s\n", lua_tostring(service->lparser, -1));
 			lua_close(service->lparser);
 			FREE (service);
+			FREE(loadf);
 			return NULL;
 		}
+		FREE(loadf);
 	}
 	return service;
 }
@@ -116,6 +136,11 @@ void service_runonce(struct service_t * service) {
 				l_on_tcp_connected(service, ev);
 				break;
 			}
+			case G2S_TCP_LISTENED: {
+				struct g2s_tcp_listened_t* ev = (struct g2s_tcp_listened_t*)packet;
+				l_on_tcp_listened(service, ev);
+				break;
+			}
 			default: {
 				assert(0);
 			}
@@ -155,6 +180,17 @@ void l_on_tcp_connected (struct service_t * service, struct g2s_tcp_connected_t 
 	int st = lua_gettop(lparser);
 	lua_pushcfunction(lparser, lua_error_cb);
 	lua_getglobal(lparser, "c_onTcpConnected");
+	lua_pushnumber(lparser, ev->sid);
+	lua_pushnumber(lparser, ev->ud);
+	lua_pcall(lparser, 2, 0, -4);
+	lua_settop(lparser, st);
+}
+
+void l_on_tcp_listened(struct service_t* service, struct g2s_tcp_listened_t * ev) {
+	struct lua_State * lparser = service->lparser;
+	int st = lua_gettop(lparser);
+	lua_pushcfunction(lparser, lua_error_cb);
+	lua_getglobal(lparser, "c_onTcpListened");
 	lua_pushnumber(lparser, ev->sid);
 	lua_pushnumber(lparser, ev->ud);
 	lua_pcall(lparser, 2, 0, -4);
@@ -203,10 +239,25 @@ static struct service_t * get_service(struct lua_State * lparser) {
 	return service;
 }
 
+int c_listen(struct lua_State * lparser) {
+	size_t len = 0;
+	struct service_t * service = get_service(lparser);
+	int ui = luaL_checkinteger(lparser, 1);
+	const char* ip = luaL_checklstring(lparser, 2, &len);
+	int port = luaL_checkinteger(lparser, 3);
+	struct s2g_tcp_listen* ev = (struct s2g_tcp_listen*)MALLOC(sizeof(*ev));
+	ev->ud = ui;
+	ev->ip = (char*)MALLOC(len+1);
+	strcpy(ev->ip, ip);
+	ev->port = port;
+	gsq_push (service->s2g_queue, S2G_TCP_LISTEN, ev);
+	service->qflag = 1;
+	return 0;
+}
+
 int c_connect(struct lua_State * lparser) {
 	size_t len = 0;
 	struct service_t * service = get_service(lparser);
-
 	int ui = luaL_checkinteger(lparser, 1);
 	const char* ip = luaL_checklstring(lparser, 2, &len);
 	int port = luaL_checkinteger(lparser, 3);

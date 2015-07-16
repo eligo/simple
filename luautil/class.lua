@@ -9,7 +9,8 @@ function template(classname)				--类模板
 	if not t then
 		local cls = {}
 		local metatable = {
-			__call = function(...)
+			__call = function(tlt, ...)
+				assert(tlt == cls)
 				local instance = {}
 				setmetatable(instance, {__index=cls})
 				instance.__init(instance, ...)

@@ -21,16 +21,13 @@ static int tcp_readed (void * ud, int id, char * data, int len);
 static int tcp_connected (void* ud, int id, int ui); 
 static void notify_so_error(struct gate_t* gate, int id, int ud);
 
-struct gate_t * gate_new(int port, struct gsq_t * g2s_queue, struct gsq_t * s2g_queue) {
+struct gate_t * gate_new(struct gsq_t * g2s_queue, struct gsq_t * s2g_queue) {
 	struct gate_t* gate = (struct gate_t *) MALLOC (sizeof(*gate));
 	struct somgr_t* somgr = somgr_new(gate, tcp_accepted, tcp_readed, tcp_errored, tcp_connected);
-	if (port && 0 >= somgr_listen(somgr, "0.0.0.0", port)) {	//端口侦听失败
-		fprintf(stderr, "listen fail\n");
-		somgr_destroy(somgr);
+	if (!somgr) {
 		FREE (gate);
 		return NULL;
 	}
-	
 	gate->g2s_queue = g2s_queue;
 	gate->s2g_queue = s2g_queue;
 	gate->somgr = somgr;
@@ -74,7 +71,21 @@ void gate_runonce (struct gate_t * gate) {
 				FREE(ev->ip);
 				break;
 			}
-			default: {
+			case S2G_TCP_LISTEN: {
+				struct s2g_tcp_listen* ev = (struct s2g_tcp_listen*)packet;
+				int id = somgr_listen(gate->somgr, ev->ip, ev->port);
+				if (id <= 0)
+					notify_so_error(gate, 0, ev->ud);
+				else {
+					struct g2s_tcp_listened_t* ev = (struct g2s_tcp_listened_t*)MALLOC(sizeof(*ev));
+					ev->sid = id;
+					ev->ud = ev->ud;
+					gsq_push(gate->g2s_queue, G2S_TCP_LISTENED, ev);
+					gate->qflag = 1;
+				}
+				FREE(ev->ip);
+				break;
+			} default: {
 				assert(0);
 			}
 		}
