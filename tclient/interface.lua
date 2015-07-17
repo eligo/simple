@@ -26,8 +26,9 @@ end
 function Client:send()
 	--if self._watting ~= 0 then return end
 	--if self._state ~= 2 then return end
-	self._tms[self._inc] = c_interface.c_unixtime_ms()
-	c_interface.c_send(self._sid, self._inc.."\r\n")
+	--self._tms[self._inc] = c_interface.c_unixtime_ms()
+	self._stm = c_interface.c_unixtime_ms()
+	c_interface.c_send(self._sid, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\r\n")--self._inc.."\r\n")
 	self._inc = self._inc + 1
 	--self._watting = c_interface.c_unixtime_ms()
 	self._state = 3
@@ -59,10 +60,10 @@ function Client:onData(data)
 	ctm = c_interface.c_unixtime_ms()
 	--assert(self._watting ~= 0)
 	--assert(self._state == 3)
-	local inc = tonumber(data)
-	assert(self._tms[inc], data)
-	delays = delays + ctm - self._tms[inc]
-	self._tms[inc] = nil
+	--local inc = tonumber(data)
+	--assert(self._tms[inc], data)
+	delays = delays + ctm - self._stm --self._tms[inc]
+	--self._tms[inc] = nil
 	sn = sn + 1
 	self._watting = 0
 	self._state = 2
@@ -71,7 +72,7 @@ end
 
 local _clients = {}
 local _sidc = {}
-for i=1, 10000 do
+for i=1, 1000 do
 	_clients[i] = Client(i)
 	_clients[i]._state = 1
 	c_interface.c_connect(i, "0.0.0.0", 9999)
@@ -136,7 +137,7 @@ end
 	for k, v in pairs(_clients) do
 		--v:onTimer()
 		if v._state > 1 then
-			--v:send()
+			v:send()
 		end
 	end
 end)]]

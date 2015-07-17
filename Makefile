@@ -7,7 +7,7 @@ INCLUDES=-I/usr/include\
 
 CXXFLAGS=-c -Wall -O2 -g $(INCLUDES)
 
-LIBS=./3rd/lib/liblua.a
+LIBS=./3rd/lib/liblua.a ./3rd/lib/libjemalloc.a
 	
 SRCDIRS=. ./common ./common/somgr ./common/timer
 SRCS=$(foreach dir,$(SRCDIRS),$(wildcard $(dir)/*.c))

@@ -309,7 +309,7 @@ void somgr_runonce(struct somgr_t* somgr, int wms) {
 	for (; i < en; i++) {
 		struct so_t* so = evs[i].data.ptr;
 		if (!so) {
-			char data[1024];
+			char data[1];
 			read(somgr->notify[0], data, sizeof(data));
 		} else if (evs[i].events & (EPOLLHUP | EPOLLERR)) {
 			somgr_remove_so(somgr, so);

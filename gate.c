@@ -21,7 +21,7 @@ static int tcp_readed (void * ud, int id, char * data, int len);
 static int tcp_connected (void* ud, int id, int ui); 
 static void notify_so_error(struct gate_t* gate, int id, int ud);
 
-struct gate_t * gate_new(struct gsq_t * g2s_queue, struct gsq_t * s2g_queue) {
+struct gate_t* gate_new(struct gsq_t * g2s_queue, struct gsq_t * s2g_queue) {
 	struct gate_t* gate = (struct gate_t *) MALLOC (sizeof(*gate));
 	struct somgr_t* somgr = somgr_new(gate, tcp_accepted, tcp_readed, tcp_errored, tcp_connected);
 	if (!somgr) {
@@ -92,6 +92,7 @@ void gate_runonce (struct gate_t * gate) {
 		FREE (packet);
 		if (time_ms() - stm >= 50) {
 			sleepms = 0;
+			printf("............................................................................%ld\n",time_ms() - stm);
 			break;
 		}
 	} while(1);
