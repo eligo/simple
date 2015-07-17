@@ -30,7 +30,7 @@ function Client:send()
 	c_interface.c_send(self._sid, self._inc.."\r\n")
 	self._inc = self._inc + 1
 	--self._watting = c_interface.c_unixtime_ms()
-	--self._state = 3
+	self._state = 3
 end
 
 --[[function Client:onTimer()
@@ -71,7 +71,7 @@ end
 
 local _clients = {}
 local _sidc = {}
-for i=1, 20 do
+for i=1, 10000 do
 	_clients[i] = Client(i)
 	_clients[i]._state = 1
 	c_interface.c_connect(i, "0.0.0.0", 9999)
@@ -132,16 +132,16 @@ function responser:sockid()
 	return self._sid
 end
 
-timer:timeout(1,-1,function()
+--[[timer:timeout(1,-1,function()
 	for k, v in pairs(_clients) do
 		--v:onTimer()
 		if v._state > 1 then
-			v:send()
+			--v:send()
 		end
 	end
-end)
+end)]]
 
-timer:timeout(10,-1,function()
+timer:timeout(11,-1,function()
 						local ctm = c_interface.c_unixtime_ms()
 						--if ctm - lasttime >= 1000 then
 							local state = {0,0,0,0}
