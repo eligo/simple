@@ -2,30 +2,33 @@
 package.cpath = string.format("%s;%s?.so", package.cpath, './3rd/luaso/')	--设置外部c库的搜索路径
 local class = require("luautil.class")	--类管理器
 require("luautil.timer")	
-require("handle.test_handle")					--协议处理实现
 --require("luautil.mysql")
 local timer = class.singleton("timer")	--定时器
 local json = require ('cjson')			--json 工具(encode decode)
 local responser = {_sid=nil}			--简单封装一些操作
-local handlers = class.singleton("protocol_handlers")	--协议处理集合
 ---------------------------------------------------------framework event---------------------------------------------------------
+local cons = {}
+local convec = {}
+local rand = 1
 function c_onTcpAccepted(sid)				--框架事件(连接接受)
-	print("c_onTcpAccepted", sid)
-	--c_interface.c_send(sid, "hello1\r\n")
-	--timer:timeout(1, -1, function() c_interface.c_send(sid, "hello world") end)
+	cons[sid] = {}
+	table.insert(convec, sid)
 end
 
 function c_onTcpConnected(sid, ud)			--框架时间(连接成功)
-	print("c_onTcpConnected", sid, ud)
 end
 
-function c_onTcpClosed(sid, ud)				--框架事件(连接断开, 或者listen失败, 或者connect失败)
-	print("c_onTcpClosed", sid, ud)
+function c_onTcpClosed(sid, ud)				--框架事件(连接断开,
+	cons[sid] = nil
+	for k, v in pairs(convec) do
+		if sid == v then
+			table.remove(convec, k)
+		end
+	end
 end
 
 c_interface.c_listen(11, "0.0.0.0", "10000")
 function c_onTcpListened(sid, ud)
-	print("server Listen suc", ud)
 end
 
 local total = 0
@@ -39,7 +42,19 @@ function c_onTcpData(sid, str)				--框架事件(连接业务数据到达)
 		c_interface.c_send(sid, "goodbye!!!\r\n")
 		c_interface.c_close(sid)	
 	end
-	c_interface.c_send(sid, "-ERR wrong number of arguments for 'get' command\r\n")--str.."\r\n")--string.format("welcome! current time: %s, enter 'quit' will close connection! recved:%s\r\n", c_interface.c_unixtime_ms(), str))
+	local i = 100
+	local sn = #convec
+	while i > 0 do
+		i = i - 1
+		rand = rand + 1
+		if rand > sn then
+			rand = 1
+		end
+		if not convec[rand] then break end
+	--for _, sid in pairs(convec) do
+		c_interface.c_send(convec[rand], str.."\r\n")--str.."\r\n")--string.format("welcome! current time: %s, enter 'quit' will close connection! recved:%s\r\n", c_interface.c_unixtime_ms(), str))
+	--end
+	end
 	total = total + 1
 	bytes = bytes + string.len(str)
 	--[[

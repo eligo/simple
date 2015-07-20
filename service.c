@@ -108,6 +108,13 @@ void service_tick(struct service_t* service, uint64_t ctick) {
 	}
 }
 
+void service_check_notify_gate_to_work(struct service_t* service) {
+	if (service->qflag) {
+		gsq_notify_g(service->g2s_queue);
+		service->qflag = 0;
+	}
+}
+
 void service_runonce(struct service_t * service) {
 	uint32_t count = 0;
 	service_tick(service, time_ms()/100);	//处理定时器
@@ -149,17 +156,11 @@ void service_runonce(struct service_t * service) {
 		if (++count%100 == 0)	{					//100是经验值可换成别的, 每处理100个业务包就处理一下定时器
 			service_tick(service, time_ms()/100);	//处理定时器	
 		}
-		if (service->qflag) {
-			gsq_notify_g(service->g2s_queue);
-			service->qflag = 0;
-		}
+		service_check_notify_gate_to_work(service);
 	}
 
 	if (count) service_tick(service, time_ms()/100);
-	if (service->qflag) {
-		gsq_notify_g(service->g2s_queue);
-		service->qflag = 0;
-	}
+	service_check_notify_gate_to_work(service);
 	gsq_notify_wait_g(service->g2s_queue, 100);
 }
 

@@ -3,7 +3,7 @@
 	模式: 半同步半异步
 	环境: 任意linux64位系统
 	编译: 进目录执行 make
-	启动: ./simple
+	启动: ./simple + 程序目录(脚本目录, 一个脚本目录代表一个程序), 例如 ./simple ./tserver
 	测试: telnet 0.0.0.0 9999
 	架构: gate模块(网络收发),service模块(业务处理)
 	协议: string + \r\n, 可以根据自己的需求来换(如protobuf, msgpack)

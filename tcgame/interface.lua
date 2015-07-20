@@ -15,35 +15,22 @@ local Client = class.template("Client")
 
 function Client:__init(id)
 	self._id = id
+	self._idstr = tostring(id).."\r\n"
+	self._idstr2 = tostring(id)
 	self._state = 0
 	self._sid = 0
 	self._watting = 0
 	self._inc = 0
 	self._onc = 0
-	--self._data = nil--= string.format("ping\r\n", self._id)
 	self._tms = {}
 end
 
 function Client:send()
-	--if self._watting ~= 0 then return end
-	--if self._state ~= 2 then return end
-	--self._tms[self._inc] = c_interface.c_unixtime_ms()
 	self._stm = c_interface.c_unixtime_ms()
-	c_interface.c_send(self._sid, "get\r\n")--"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\r\n")--self._inc.."\r\n")
+	c_interface.c_send(self._sid, self._idstr)--"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\r\n")
 	self._inc = self._inc + 1
-	--self._watting = c_interface.c_unixtime_ms()
 	self._state = 3
 end
-
---[[function Client:onTimer()
-	if self._state == 0 then
-		self._state = 1
-		c_interface.c_connect(self._id, "0.0.0.0", 9999)
-	elseif self._state == 2 then
-		self:send()
-	end
-end]]
-
 function Client:onConn(sid)
 	self._sid = sid
 	self._state = 2
@@ -58,31 +45,16 @@ end
 
 local ctm = 0
 function Client:onData(data)
-	--print(data)
-	self._onc = self._onc + 1
-	assert(self._onc == self._inc, string.format("%d---%d %s", self._onc, self._inc, data))
-	--assert(data == "helloworld")
-	ctm = c_interface.c_unixtime_ms()
-	--assert(self._watting ~= 0)
-	--assert(self._state == 3)
-	--local inc = tonumber(data)
-	--assert(self._tms[inc], data)
-	--print(data)
-	delays = delays + ctm - self._stm --self._tms[inc]
-	--self._tms[inc] = nil
-	sn = sn + 1
-	self._watting = 0
-	self._state = 2
-	self:send()
+	if data == self._idstr2 then
+		ctm = c_interface.c_unixtime_ms()
+		delays = ctm - self._stm
+		sn = sn + 1
+		--print(data, self._idstr2)
+	end
 end
 
 local _clients = {}
 local _sidc = {}
-for i=1, 1 do
-	_clients[i] = Client(i)
-	_clients[i]._state = 1
-	c_interface.c_connect(i, "0.0.0.0", 6379)--6379)
-end
 
 ---------------------------------------------------------framework event---------------------------------------------------------
 function c_onTcpAccepted(sid)				--框架事件(连接接受)
@@ -96,7 +68,6 @@ function c_onTcpConnected(sid, ud)			--框架时间(连接成功)
 end
 
 function c_onTcpClosed(sid, ud)				--框架事件(连接断开, 或者listen失败, 或者connect失败)
-	--print("c_onTcpClosed", sid, ud)
 	if ud == 0 then
 		_clients[_sidc[sid]]:onClose(sid)
 	else
@@ -122,33 +93,21 @@ function c_onTimer(tid, erased)				--框架事件(某定时器到期触发) 定�
 end
 
 ---------------------------------------------------------other---------------------------------------------------------
-function responser:write (content)
-	local ty = type (content)
-	if ty == 'table' then
-		c_interface.c_send(self._sid, json.encode(content))
-	elseif ty == 'string' then
-		c_interface.c_send(self._sid, content)
+
+for i=1, 10000 do
+	_clients[i] = Client(i)
+	_clients[i]._state = 1
+	c_interface.c_connect(i, "0.0.0.0", 10000)--6379)
+end
+
+timer:timeout(10,-1,function()
+	for sid, ud in pairs(_sidc) do
+		_clients[ud]:send()
 	end
 end
+)
 
-function responser:closeconnect ()
-	c_interface.c_close(self._sid)
-end
-
-function responser:sockid()
-	return self._sid
-end
-
---[[timer:timeout(1,-1,function()
-	for k, v in pairs(_clients) do
-		--v:onTimer()
-		if v._state > 1 then
-			v:send()
-		end
-	end
-end)]]
-
-timer:timeout(11,-1,function()
+timer:timeout(10,-1,function()
 						local ctm = c_interface.c_unixtime_ms()
 						--if ctm - lasttime >= 1000 then
 							local state = {0,0,0,0}

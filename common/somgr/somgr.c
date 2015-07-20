@@ -24,27 +24,27 @@ struct somgr_t {
 	struct soqueue_t freesos;	//备用的socket, 可以重新分配的
 	struct soqueue_t badsos;	//待关闭的socket, 已经被踢掉或者已经出错的
 	struct soqueue_t writesos;	//待写的socket, 能写并且有数据要写的
-	void* ud;
-	soacb acb;
-	sorcb rcb;
-	soecb ecb;
-	soccb ccb;
-	int notify[2];
-	int waitnotify;
-	int waitting;
+	void* ud;	//用户数据
+	soacb acb;	//accepted 回调
+	sorcb rcb;	//readed 回调
+	soecb ecb;	//errored 回调
+	soccb ccb;	//connected 回调用
+	int notify[2];				//socket pair for job-notify between 2 threads
+	volatile int waitnotify;	//1 means other thread is watting for somgr
+	volatile int waitting;		//1 means somgr is blocking in epoll_wait
 };
 
-static void somgr_expand_sos(struct somgr_t* somgr);
-struct so_t* somgr_alloc_so(struct somgr_t* somgr);
-void somgr_remove_so(struct somgr_t* somgr, struct so_t* so);
-int somgr_add_so(struct somgr_t* somgr, struct so_t* so);
-int somgr_mod_so(struct somgr_t* somgr, struct so_t* so, int w);
-void somgr_free_so(struct somgr_t* somgr, struct so_t* so);
-static int fd_setnoblock(int fd);
-static int so_setnoblock(struct so_t* so);
-static void so_setstate(struct so_t* so, int sta);
-static uint32_t so_hasstate(struct so_t* so, int sta);
-static void so_clearstate(struct so_t* so, int sta);
+static void somgr_expand_sos(struct somgr_t* somgr);	//扩展连接上下文池
+struct so_t* somgr_alloc_so(struct somgr_t* somgr);		//从池拿出一个上下文
+void somgr_remove_so(struct somgr_t* somgr, struct so_t* so);	//从epoll移出一个连接
+int somgr_add_so(struct somgr_t* somgr, struct so_t* so);		//向epoll加入一个连接
+int somgr_mod_so(struct somgr_t* somgr, struct so_t* so, int w);//从epoll修改某个连接
+void somgr_free_so(struct somgr_t* somgr, struct so_t* so);		//释放某连接
+static int fd_setnoblock(int fd);			//把文件描述符设置成非堵塞
+static int so_setnoblock(struct so_t* so);	//把连接设置成非堵塞(同上)
+static void so_setstate(struct so_t* so, int sta);		//设置连接状态
+static uint32_t so_hasstate(struct so_t* so, int sta);	//判断某连接是否有某状态
+static void so_clearstate(struct so_t* so, int sta);	//清除某连接某个状态
 
 struct somgr_t* somgr_new(void* ud, soacb a, sorcb r, soecb e, soccb c) {
 	int ep = 0;

@@ -92,7 +92,6 @@ void gate_runonce (struct gate_t * gate) {
 		FREE (packet);
 		if (time_ms() - stm >= 50) {
 			sleepms = 0;
-			printf("............................................................................%ld\n",time_ms() - stm);
 			break;
 		}
 	} while(1);
