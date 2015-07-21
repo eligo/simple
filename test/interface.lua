@@ -33,7 +33,7 @@ function c_onTimer(tid, erased)				--框架事件(某定时器到期触发) 定�
 end
 
 timer:timeout(10,-1,function()
-						--print(string.format("welcome, currentTime : %d", external.unixms()))
+						print(string.format("hello simple, current unix ms : %d", external.unixms()))
 					end
 )
 
