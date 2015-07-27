@@ -8,7 +8,7 @@ local external = class.singleton("external")
 function c_onTcpAccepted(sid)				--框架事件(接受外来连接)
 end
 
-function c_onTcpConnected(sid, ud)			--框架时间(对外连接成功)
+function c_onTcpConnected(sid, ud)			--框架事件(对外连接成功)
 end
 
 function c_onTcpClosed(sid, ud)				--框架事件(连接断开, 或者listen失败, 或者connect失败)
