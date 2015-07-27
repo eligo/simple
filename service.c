@@ -43,7 +43,7 @@ struct service_t * service_new(struct gsq_t * g2s_queue, struct gsq_t * s2g_queu
 	if (service) {
 		service->g2s_queue = g2s_queue;
 		service->s2g_queue = s2g_queue;
-		service->timer = timer_new(10*60*5);	//1/10秒精度的定时器, 缓存为5分钟(当然超出30分钟也是可以的)
+		service->timer = timer_new(10*60*5);	//1/10秒精度的定时器, 缓存为5分钟(当然超出5分钟也是可以的)
 		service->lparser = lua_open();
 		service->tick = time_real_ms()/100;
 		luaL_openlibs(service->lparser);
