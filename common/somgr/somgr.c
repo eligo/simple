@@ -1,22 +1,15 @@
 #include "somgr.h"
 #include "so_util.h"
 #include "../global.h"
-#include <stdio.h>  
 #include <unistd.h>  
 #include <errno.h> 
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
-#include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>  
-#include <sys/un.h>  
-#include <sys/types.h>  
-#include <sys/wait.h>  
 #include <sys/epoll.h>
 #include <fcntl.h>
-#include <sys/time.h>
-#include <sys/select.h>
 struct somgr_t {
 	int ep;
 	struct so_t** sos;
@@ -33,7 +26,6 @@ struct somgr_t {
 	volatile int waitnotify;	//1 means other thread is watting for somgr
 	volatile int waitting;		//1 means somgr is blocking in epoll_wait
 };
-
 static void somgr_expand_sos(struct somgr_t* somgr);	//扩展连接上下文池
 struct so_t* somgr_alloc_so(struct somgr_t* somgr);		//从池拿出一个上下文
 void somgr_remove_so(struct somgr_t* somgr, struct so_t* so);	//从epoll移出一个连接
@@ -90,7 +82,6 @@ void somgr_destroy(struct somgr_t* somgr) {
 	}
 	if (somgr->sos)
 		FREE(somgr->sos);
-
 	close(somgr->ep);
 	close(somgr->notify[0]);
 	close(somgr->notify[1]);
@@ -294,7 +285,7 @@ void somgr_runonce(struct somgr_t* somgr, int wms) {
 	do {	//处理有数据要发送且当前状态为可写的socket
 		struct so_t* so = soqueue_pop(&somgr->writesos);
 		if (!so) break;
-		if (somgr_flush_so(somgr, so)) {		//真正发送
+		if (somgr_flush_so(somgr, so)) {		//发送(也就把数据拷贝到系统缓冲区,系统啥时候发就啥时候发,用户程序无法干预)
 			somgr_remove_so(somgr, so);
 		} else if (sbuf_cur(&so->wbuf) > 0) {	//还有数据没推出去说明该socket变成不可写了
 			so_clearstate(so, SOS_WRITABLE);	//设置成不可写

@@ -35,7 +35,6 @@ struct soqueue_t {
 	uint32_t num;	
 };
 
-
 int sbuf_expand(struct sbuf_t* sbuf, uint32_t need);	//扩展缓存
 uint32_t sbuf_freesz(struct sbuf_t* sbuf);				//获取缓存空闲的空间大小
 int sbuf_readed(struct sbuf_t* sbuf, uint32_t n);		//读取n字节
