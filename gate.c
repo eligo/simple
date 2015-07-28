@@ -53,41 +53,41 @@ void gate_runonce (struct gate_t * gate) {
 		void * packet = gsq_pop(gate->s2g_queue, &type);
 		if (!packet) break;
 		switch (type) {
-			case S2G_TCP_DATA: {
-				struct s2g_tcp_data_t* ev = (struct s2g_tcp_data_t*)packet;
-				somgr_write(gate->somgr, ev->sid, (char*)ev+sizeof(*ev), ev->dlen);
-				break;
+		case S2G_TCP_DATA: {
+			struct s2g_tcp_data_t* ev = (struct s2g_tcp_data_t*)packet;
+			somgr_write(gate->somgr, ev->sid, (char*)ev+sizeof(*ev), ev->dlen);
+			break;
+		}
+		case S2G_TCP_CLOSE: {
+			struct s2g_tcp_close_t* ev = (struct s2g_tcp_close_t*)packet;
+			somgr_kick(gate->somgr, ev->sid);
+			break;
+		}
+		case S2G_TCP_CONNECT: {
+			struct s2g_tcp_connect* ev = (struct s2g_tcp_connect*)packet;
+			int id = somgr_connect(gate->somgr, ev->ip, ev->port, ev->ud);
+			if (id <= 0)
+				notify_so_error(gate, 0, ev->ud);
+			FREE(ev->ip);
+			break;
+		}
+		case S2G_TCP_LISTEN: {
+			struct s2g_tcp_listen* ev = (struct s2g_tcp_listen*)packet;
+			int id = somgr_listen(gate->somgr, ev->ip, ev->port);
+			if (id <= 0)
+				notify_so_error(gate, 0, ev->ud);
+			else {
+				struct g2s_tcp_listened_t* ev = (struct g2s_tcp_listened_t*)MALLOC(sizeof(*ev));
+				ev->sid = id;
+				ev->ud = ev->ud;
+				gsq_push(gate->g2s_queue, G2S_TCP_LISTENED, ev);
+				gate->qflag = 1;
 			}
-			case S2G_TCP_CLOSE: {
-				struct s2g_tcp_close_t* ev = (struct s2g_tcp_close_t*)packet;
-				somgr_kick(gate->somgr, ev->sid);
-				break;
-			}
-			case S2G_TCP_CONNECT: {
-				struct s2g_tcp_connect* ev = (struct s2g_tcp_connect*)packet;
-				int id = somgr_connect(gate->somgr, ev->ip, ev->port, ev->ud);
-				if (id <= 0)
-					notify_so_error(gate, 0, ev->ud);
-				FREE(ev->ip);
-				break;
-			}
-			case S2G_TCP_LISTEN: {
-				struct s2g_tcp_listen* ev = (struct s2g_tcp_listen*)packet;
-				int id = somgr_listen(gate->somgr, ev->ip, ev->port);
-				if (id <= 0)
-					notify_so_error(gate, 0, ev->ud);
-				else {
-					struct g2s_tcp_listened_t* ev = (struct g2s_tcp_listened_t*)MALLOC(sizeof(*ev));
-					ev->sid = id;
-					ev->ud = ev->ud;
-					gsq_push(gate->g2s_queue, G2S_TCP_LISTENED, ev);
-					gate->qflag = 1;
-				}
-				FREE(ev->ip);
-				break;
-			} default: {
-				assert(0);
-			}
+			FREE(ev->ip);
+			break;
+		} default: {
+			assert(0);
+		}
 		}
 		FREE (packet);
 		if (time_ms() - stm >= 50) {

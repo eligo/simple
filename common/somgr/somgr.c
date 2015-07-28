@@ -166,12 +166,12 @@ dowrite:
 		goto dowrite;
 	} else if (wn < 0) {
 		switch (errno) {
-			case EAGAIN:	//写不进了, 对方接收过慢会产生这种情况(tcp滑动窗口机制)
-				return 0;
-			case EINTR:		//被系统中断打断, 可继续尝试
-				goto dowrite;
-			default:		//肯定有错误发生了
-				goto fail;
+		case EAGAIN:	//写不进了, 对方接收过慢会产生这种情况(tcp滑动窗口机制)
+			return 0;
+		case EINTR:		//被系统中断打断, 可继续尝试
+			goto dowrite;
+		default:		//肯定有错误发生了
+			goto fail;
 		}
 	} else goto fail;
 fail:
@@ -212,10 +212,10 @@ void somgr_proc_rw(struct somgr_t* somgr, struct so_t* so, unsigned ev) {	//处�
 			if (so_hasstate(so, SOS_BAD)) goto fail;	//因为rcb可能会把该socket kick 掉， 所以检查一下是有必要的
 		} else if (rn < 0) {
 			switch (errno) {
-				case EAGAIN:	//没有内容可读
-				case EINTR:		//读的过程中被系统中断, 可以下次再重试操作
-					break;
-				default: goto fail;
+			case EAGAIN:	//没有内容可读
+			case EINTR:		//读的过程中被系统中断, 可以下次再重试操作
+				break;
+			default: goto fail;
 			}
 		} else goto fail;
 	}
@@ -244,11 +244,11 @@ void somgr_proc_accept(struct somgr_t* somgr, struct so_t* lso) {
 	int fd = accept(lso->fd, &addr, &addrlen);//TODO try more times
 	if (fd == -1) {
 		switch (errno) {
-			case EINTR:
-			case EAGAIN:
-			case EMFILE:
-				return;				//可以留到下一次尝试
-			default: goto e_fderr1;
+		case EINTR:
+		case EAGAIN:
+		case EMFILE:
+			return;				//可以留到下一次尝试
+		default: goto e_fderr1;
 		}
 	} else if (fd == 0)
 		goto e_fderr2;
@@ -333,7 +333,7 @@ int somgr_write(struct somgr_t* somgr, int32_t id, char* data, uint32_t dlen) {
 			if (sbuf_expand(&so->wbuf, dlen - fz)) goto fail;			//只好扩展本地缓存空间了, TODO 扩展内存上限
 		}
 	}
-	memcpy(sbuf_cptr(&so->wbuf), data, dlen);		//仅拷贝到本地缓存而不立刻发送(相当于累多点一次性发, 是为了优化调用write的次数)
+	memcpy(sbuf_cptr(&so->wbuf), data, dlen);		//仅拷贝到本地缓存而不立刻发送(累多点一次性发, 是为了优化调用write的次数)
 	sbuf_writed(&so->wbuf, dlen);					//维护本地缓存
 	if (so_hasstate(so, SOS_WRITABLE)) {			//如果so可写
 		if (!so->curq)								//又不在待写队列

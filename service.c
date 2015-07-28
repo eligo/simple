@@ -135,34 +135,34 @@ void service_runonce(struct service_t * service) {
 		void * packet = gsq_pop(service->g2s_queue, &type);
 		if (!packet) break;
 		switch (type) {
-			case G2S_TCP_ACCEPTED: {
-				struct g2s_tcp_accepted_t * ev = (struct g2s_tcp_accepted_t*)packet;
-				l_on_tcp_accepted(service, ev);
-				break;
-			}
-			case G2S_TCP_CLOSED: {
-				struct g2s_tcp_closed_t * ev = (struct g2s_tcp_closed_t*)packet;
-				l_on_tcp_closed(service, ev);
-				break;
-			}
-			case G2S_TCP_DATA: {
-				struct g2s_tcp_data_t * ev = (struct g2s_tcp_data_t*)packet;
-				l_on_tcp_data(service, ev);
-				break;
-			}
-			case G2S_TCP_CONNECTED: {
-				struct g2s_tcp_connected_t* ev = (struct g2s_tcp_connected_t*)packet;
-				l_on_tcp_connected(service, ev);
-				break;
-			}
-			case G2S_TCP_LISTENED: {
-				struct g2s_tcp_listened_t* ev = (struct g2s_tcp_listened_t*)packet;
-				l_on_tcp_listened(service, ev);
-				break;
-			}
-			default: {
-				assert(0);
-			}
+		case G2S_TCP_ACCEPTED: {
+			struct g2s_tcp_accepted_t * ev = (struct g2s_tcp_accepted_t*)packet;
+			l_on_tcp_accepted(service, ev);
+			break;
+		}
+		case G2S_TCP_CLOSED: {
+			struct g2s_tcp_closed_t * ev = (struct g2s_tcp_closed_t*)packet;
+			l_on_tcp_closed(service, ev);
+			break;
+		}
+		case G2S_TCP_DATA: {
+			struct g2s_tcp_data_t * ev = (struct g2s_tcp_data_t*)packet;
+			l_on_tcp_data(service, ev);
+			break;
+		}
+		case G2S_TCP_CONNECTED: {
+			struct g2s_tcp_connected_t* ev = (struct g2s_tcp_connected_t*)packet;
+			l_on_tcp_connected(service, ev);
+			break;
+		}
+		case G2S_TCP_LISTENED: {
+			struct g2s_tcp_listened_t* ev = (struct g2s_tcp_listened_t*)packet;
+			l_on_tcp_listened(service, ev);
+			break;
+		}
+		default: {
+			assert(0);
+		}
 		}
 		FREE (packet);
 		if (++count%100 == 0)	{					//100是经验值可换成别的, 每处理100个业务包就处理一下定时器
