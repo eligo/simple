@@ -274,15 +274,14 @@ void somgr_runonce(struct somgr_t* somgr, int wms) {
 	struct epoll_event evs[1024];
 	int en = 0;
 	int i = 0;
-	do {	//处理坏掉的socket
+	for(;;){	//处理坏掉的socket
 		struct so_t* so = soqueue_pop(&somgr->badsos);
 		if (!so) break;
 		uint32_t soid = so->id;
 		somgr->ecb(somgr->ud, soid, so->ud);
 		somgr_free_so(somgr, so);
-	} while(1);
-
-	do {	//处理有数据要发送且当前状态为可写的socket
+	}
+	for(;;) {	//处理有数据要发送且当前状态为可写的socket
 		struct so_t* so = soqueue_pop(&somgr->writesos);
 		if (!so) break;
 		if (somgr_flush_so(somgr, so)) {		//发送(也就把数据拷贝到系统缓冲区,系统啥时候发就啥时候发,用户程序无法干预)
@@ -292,8 +291,7 @@ void somgr_runonce(struct somgr_t* somgr, int wms) {
 			if (somgr_mod_so(somgr, so, 1))		//重写设置感兴趣的事件(加入可写事件)
 				somgr_remove_so(somgr, so);
 		}
-	} while (1);
-
+	}
 	somgr->waitting = 1;						//标志somgr当前正在查询, 这个状态不用非常严格, 仅在唤醒这一块有一点用
 	en = epoll_wait(somgr->ep, evs, 1024, wms);	//查询epoll里面所有socket事件(最多1024个,epoll内部会有排队机制,一次拿不完,多次肯定可以拿完)
 	somgr->waitting = 0;						//取消正在查询状态
@@ -477,15 +475,13 @@ void so_clearstate(struct so_t* so, int sta) {		//清除sta这个状态
 }
 
 void somgr_notify_s(struct somgr_t* somgr) {		//唤醒在等待唤醒的线程(service)(向notify[0]写入一个字节,驱动堵塞在select函数上面的service模块马上返回)
-	if (somgr->waitnotify) {
+	if (somgr->waitnotify)
 		write(somgr->notify[0], "a", 1);
-	}
 }
 
 void somgr_notify_g(struct somgr_t* somgr) {		//唤醒gate(向nofity[1]写入一个字节,驱动堵塞在epoll_wait上的gate模块马上返回)
-	if (somgr->waitting) {
+	if (somgr->waitting)
 		write(somgr->notify[1], "b", 1);
-	}
 }
 
 void somgr_notify_wait_g(struct somgr_t* somgr, int ms) {	//别的线程(service)调来sleep, somgr随时调用somgr_notify_s来唤醒它
@@ -496,8 +492,7 @@ void somgr_notify_wait_g(struct somgr_t* somgr, int ms) {	//别的线程(service
 	FD_ZERO(&fds);
 	FD_SET(fd, &fds);
 	somgr->waitnotify = 1;
-	if (0 < select(fd+1, &fds, NULL, NULL, &timeout)) {
+	if (0 < select(fd+1, &fds, NULL, NULL, &timeout))
 		read(fd, data, sizeof(data));
-	}
 	somgr->waitnotify = 0;
 }
