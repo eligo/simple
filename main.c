@@ -17,11 +17,15 @@ int main(int nargs, char** args) {
 	pthread_t gate_thread;			//gate线程句柄
 	pthread_t service_thread;		//service线程句柄
 	struct sigaction sa1, sa2;
+	sigemptyset(&sa1.sa_mask);
+	sigemptyset(&sa2.sa_mask);
 	sa1.sa_handler = SIG_IGN;		//忽略该信号
 	sa2.sa_handler = _sighdl;		//设置信号处理方法
 	sigaction(SIGPIPE, &sa1, 0);	//屏蔽SIGPIPE信号, 这种信号相当容易发生, 写一个对方已经close掉的socket时会产生, 俗称管道破裂
+	sigaction(SIGHUP, &sa1, 0);		//crt异常关闭时会产生这个信号
 	sigaction(SIGINT, &sa2, 0);		//添加SIGINT(ctrl + c) SIGTERM (kill pid) 信号处理
 	sigaction(SIGTERM, &sa2, 0);
+	
 	if (nargs < 2) {
 		fprintf(stderr, "missing script path, such as : ./simple test\n");
 		return -1;
@@ -45,6 +49,7 @@ int main(int nargs, char** args) {
 	pthread_create(&service_thread, NULL, _serv, service);//创建一个线程用于 service 模块
 	for(;!_stop;) {				//收到关闭信号会让_stop变成1
 		usleep(1000);			//TODO 定时监控一下 gate service 运行是否健康
+		fflush(stdout);
 		time_global_reset();	//主线程1毫秒重置一下全局当前时间,以便业务可以拿到更真实的时间
 	}							//TODO 应该向业务发一条关闭通知,以便业务做好数据保存之类的工作
 	pthread_join(gate_thread, NULL);	//等待线程结束
@@ -71,5 +76,6 @@ void* _serv(void * ptr) {		 //驱动 service 进行工作
 }
 
 void _sighdl(int signal) {
+	printf("recv signal %d\n", signal);
 	_stop = 1;
 }

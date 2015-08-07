@@ -16,6 +16,7 @@ enum GS_EV {
 
 struct g2s_tcp_accepted_t {
 	int sid;
+	char ip[24];
 };
 
 struct g2s_tcp_closed_t {

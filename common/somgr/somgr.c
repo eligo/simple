@@ -572,5 +572,24 @@ void somgr_notify_wait_g(struct somgr_t* somgr, int ms) {//等待超时/唤醒
 	somgr->waitnotify = 1;
 	if (0 < select(fd+1, &fds, NULL, NULL, &timeout))
 		read(fd, data, sizeof(data));
+	
 	somgr->waitnotify = 0;
+}
+
+int somgr_getpeername(struct somgr_t* somgr, int32_t id, char *ip) {
+	struct sockaddr_in addr;
+	socklen_t addrlen = sizeof(addr);
+	
+	if (id < 1 || id >= somgr->sosn) 
+		return -1;
+
+	struct so_t* so = somgr->sos[id];
+	if (so_hasstate(so, SOS_BAD | SOS_LISTEN | SOS_FREE | SOS_CONNECTTING)) 
+		return -2;
+
+	if (0 != getpeername(so->fd, (struct sockaddr *)&addr, &addrlen)) {
+		return -3;
+	}
+	strcpy(ip, inet_ntoa(addr.sin_addr));
+	return 0;
 }

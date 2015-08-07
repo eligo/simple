@@ -77,10 +77,10 @@ void gate_runonce (struct gate_t * gate) {
 			if (id <= 0)
 				notify_so_error(gate, 0, ev->ud);
 			else {
-				struct g2s_tcp_listened_t* ev = (struct g2s_tcp_listened_t*)MALLOC(sizeof(*ev));
-				ev->sid = id;
-				ev->ud = ev->ud;
-				gsq_push(gate->g2s_queue, G2S_TCP_LISTENED, ev);
+				struct g2s_tcp_listened_t* rev = (struct g2s_tcp_listened_t*)MALLOC(sizeof(*rev));
+				rev->sid = id;
+				rev->ud = ev->ud;
+				gsq_push(gate->g2s_queue, G2S_TCP_LISTENED, rev);
 				gate->qflag = 1;
 			}
 			FREE(ev->ip);
@@ -106,6 +106,7 @@ int tcp_accepted(void *ud, int lid, int nid) {	//tcp 建立时回调
 	struct gate_t * gate = (struct gate_t *)ud;
 	struct g2s_tcp_accepted_t * ev = (struct g2s_tcp_accepted_t*)MALLOC(sizeof(*ev));
 	ev->sid = nid;
+	somgr_getpeername(gate->somgr, nid, ev->ip);
 	gsq_push(gate->g2s_queue, G2S_TCP_ACCEPTED, ev);
 	gate->qflag = 1;
 	return 0;

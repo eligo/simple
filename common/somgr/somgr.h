@@ -19,4 +19,5 @@ int somgr_kick(struct somgr_t* somgr, int32_t id);		//踢掉一条连接
 void somgr_notify_s(struct somgr_t* somgr);				//唤醒service
 void somgr_notify_g(struct somgr_t* somgr);				//唤醒gate
 void somgr_notify_wait_g(struct somgr_t* somgr, int ms);//service模块调来于等待gate事件, gate模块可以随时调用somgr_notify_s来唤醒它
+int somgr_getpeername(struct somgr_t* somgr, int32_t id, char *ip);
 #endif

@@ -184,7 +184,8 @@ void l_on_tcp_accepted (struct service_t * service, struct g2s_tcp_accepted_t * 
 	lua_pushcfunction(lparser, lua_error_cb);
 	lua_pushvalue(lparser, service->idx_accepted);
 	lua_pushnumber(lparser, ev->sid);
-	lua_pcall(lparser, 1, 0, -3);
+	lua_pushstring(lparser, ev->ip);
+	lua_pcall(lparser, 2, 0, -4);
 	lua_settop(lparser, st);
 }
 

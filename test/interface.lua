@@ -5,7 +5,11 @@ local class = require("lualib.class")	--类管理器(模板及实例)
 local timer = class.singleton("timer")	--定时器
 local external = class.singleton("external")
 ---------------------------------------------------------framework event---------------------------------------------------------
-function c_onTcpAccepted(sid)				--框架事件(接受外来连接)
+local mLow, mHigh = 10008, 10008
+local ips = {}
+function c_onTcpAccepted(sid, ip)				--框架事件(接受外来连接)
+	--print("accept", sid, ip)
+	ips[sid] = ip
 end
 
 function c_onTcpConnected(sid, ud)			--框架事件(对外连接成功)
@@ -13,14 +17,17 @@ end
 
 function c_onTcpClosed(sid, ud)				--框架事件(连接断开, 或者listen失败, 或者connect失败)
 	--printf("socket error", sid, ud)
+	if ud and ud > 0 then
+		print("listen fail", ud)
+	end
 end
 
 function c_onTcpListened(sid, ud)
-	print("server Listen suc", ud)
+	--print("server Listen suc", ud)
 end
 
 function c_onTcpData(sid, str)				--框架事件(连接业务数据到达)
-	--print("recv", str)
+	print(os.time(), "from", ips[sid], str)
 	if str == 'quit' then
 		external.close(sid)
 	else
@@ -33,10 +40,12 @@ function c_onTimer(tid, erased)				--框架事件(某定时器到期触发) 定�
 end
 
 timer:timeout(10,-1,function()
-						print(string.format("hello simple, current unix ms : %d", external.unixms()))
+						--print(string.format("hello simple, current unix ms : %d", external.unixms()))
 					end
 )
 
 --c_onTcpAccepted = nil
 --c_onTcpListened = nil
-external.listen(11, "0.0.0.0", "10000")
+for i = mLow, mHigh do
+	external.listen(i, "0.0.0.0", i)
+end
