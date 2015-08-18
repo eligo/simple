@@ -8,7 +8,7 @@ local external = class.singleton("external")
 local mLow, mHigh = 10008, 10008
 local ips = {}
 function c_onTcpAccepted(sid, ip)				--框架事件(接受外来连接)
-	--print("accept", sid, ip)
+	print("accept", sid, ip)
 	ips[sid] = ip
 end
 
@@ -49,3 +49,17 @@ timer:timeout(10,-1,function()
 for i = mLow, mHigh do
 	external.listen(i, "0.0.0.0", i)
 end
+
+--[[
+local mysqllib = require("lmysql")
+local connect, err = mysqllib:connect("db1", "root", "", "0.0.0.0", 3306)
+print("a", connect, err)
+local cursor, err = connect:select("t1", "id, name", nil)
+print("b", cursor, err)
+
+while true do
+        local info = cursor:fetchrow()
+        if not info then break end
+        print(info.id, info.name)
+end
+]]
