@@ -50,7 +50,8 @@ for i = mLow, mHigh do
 	external.listen(i, "0.0.0.0", i)
 end
 
---[[
+--[[ mysql usage
+
 local mysqllib = require("lmysql")
 local connect, err = mysqllib:connect("db1", "root", "", "0.0.0.0", 3306)
 print("a", connect, err)

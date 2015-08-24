@@ -14,9 +14,9 @@ struct somgr_t {
 	int ep;
 	struct so_t** sos;
 	uint32_t sosn;
-	struct soqueue_t freesos;	//备用的socket, 可以重新分配的
-	struct soqueue_t badsos;	//待关闭的socket, 已经被踢掉或者已经出错的
-	struct soqueue_t writesos;	//待写的socket, 能写并且有数据要写的
+	struct soqueue_t freesos;	//备用的连接信息
+	struct soqueue_t badsos;	//待关闭的连接, 已经被踢掉或者已经出错的
+	struct soqueue_t writesos;	//待写的连接, 能写并且有数据要写的
 	void* ud;	//用户数据
 	soacb acb;	//accepted 回调
 	sorcb rcb;	//readed 回调
