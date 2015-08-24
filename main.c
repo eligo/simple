@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include "common/timer/timer.h"
-#include "common/net/net.h"
+//#include "common/net/net.h"
 static void* _gate(void * ptr);		//gate线程入口
 static void* _serv(void * ptr);		//service线程入口
 static void _sighdl(int signal); 	//进程信号回调
