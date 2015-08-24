@@ -50,12 +50,12 @@ for i = mLow, mHigh do
 	external.listen(i, "0.0.0.0", i)
 end
 
---[[ mysql usage
+--[[mysql usage
 
 local mysqllib = require("lmysql")
 local connect, err = mysqllib:connect("db1", "root", "", "0.0.0.0", 3306)
 print("a", connect, err)
-local cursor, err = connect:select("t1", "id, name", nil)
+local cursor, err = connect:execute("select * from t1 order by id")--("update t1 set name='namev'")--select("t1", "id, name", nil, nil)
 print("b", cursor, err)
 
 while true do

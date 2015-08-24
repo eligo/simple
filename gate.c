@@ -144,8 +144,11 @@ int tcp_readed (void * ud, int id, char * data, int len) {	//收到数据时回�
 		if (data[cur] == '\r') {	//tcp 是流式数据, 所以要双端约定好业务包的分割方式,暂时用\r\n进行分割
 			if (cur == len - 1)
 				return readed;
-			if (data[cur+1] != '\n')
-				return -1;	//error occur
+			if (data[cur+1] != '\n') {
+				++cur;
+				continue;
+				//return -1;	//error occur
+			}
 			int plen = cur - start;
 			struct g2s_tcp_data_t * ev = (struct g2s_tcp_data_t*)MALLOC(sizeof(*ev)+plen);
 			ev->sid = id;
