@@ -12,5 +12,5 @@
 		  scripts 业务脚本
 		  luautil 业务层可重用的一些代码
 		  common/timer 基于时间轮的定时器
-		  common/somgr 基于epoll的tcp连接管理器
+		  common/somgr 基于epoll的tcp连接管理器 
 	
